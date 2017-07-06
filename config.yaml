@@ -1,0 +1,10 @@
+report_title: A/B Test Analysis
+data: NULL # if not NULL, query won't be run and specified dataset will be used
+query: NULL # if not NULL, this query string will overwrite query builder
+start_date: 20170630 # inclusive
+end_date: 20170707 # exclusive
+TSS2 revision number: 16909631
+wiki: enwiki # e.g. [enwiki, frwiki, eswiki]
+test group names: [explore_similar_control, explore_similar_test]
+event_action: NULL
+event_source: fulltext
