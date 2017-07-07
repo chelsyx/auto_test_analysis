@@ -1,14 +1,14 @@
 ---
 params: 
   report_title: A/B Test Analysis
-  data: NULL #./data/AB Test Analysis/events_raw_20170703155930.RData
-  query: NULL 
+  data: ./data/AB Test Analysis/events_raw_20170703155930.RData
+  query: 'SELECT * FROM TestSearchSatisfaction2_16909631;' 
   start_date: 20170630 # inclusive
   end_date: 20170707 # exclusive
   TSS2 revision number: 16909631
   wiki: enwiki
   test group names: [explore_similar_control, explore_similar_test]
-  event_action: NULL #[searchResultPage, click, esclick, hover-on, hover-off]
+  event_action: [searchResultPage, click]
   event_source: fulltext
 title: "`r params$report_title`"
 date: '`r Sys.Date()`'
@@ -43,10 +43,14 @@ query <- paste0("SELECT
     END AS event_position,
   CASE
     WHEN event_action = 'searchResultPage' AND event_hitsReturned > 0 THEN 'TRUE'
-    WHEN event_action = 'searchResultPage' AND event_hitsReturned = 0 THEN 'FALSE'
+    WHEN event_action = 'searchResultPage' AND event_hitsReturned IS NULL THEN 'FALSE'
     ELSE NULL
     END AS `some same-wiki results`,
-  event_hitsReturned AS n_results,
+  CASE
+    WHEN event_action = 'searchResultPage' AND event_hitsReturned > -1 THEN event_hitsReturned
+    WHEN event_action = 'searchResultPage' AND event_hitsReturned IS NULL THEN 0
+    ELSE NULL
+    END AS n_results,
   event_scroll,
   event_checkin,
   event_extraParams,
@@ -60,7 +64,7 @@ ifelse(is.null(params$`test group names`), "", paste0("  AND event_subTest IN('"
 ifelse(is.null(params$event_action), "", paste0("  AND event_action IN('", paste(params$event_action, collapse = "', '"), "') \n")),
 ifelse(is.null(params$event_source), "", paste0("  AND event_source IN('", paste(params$event_source, collapse = "', '"), "') \n")),
 "  AND (
-   (event_action = 'searchResultPage' AND event_hitsReturned IS NOT NULL AND event_msToDisplayResults IS NOT NULL)
+   (event_action = 'searchResultPage' AND event_msToDisplayResults IS NOT NULL)
    OR
    (event_action = 'click' AND event_position IS NOT NULL AND event_position > -1)
    OR
@@ -143,7 +147,7 @@ searches <- events %>%
   dplyr::arrange(date, session_id, serp_id, timestamp) %>%
   dplyr::group_by(group, wiki, session_id, serp_id) %>%
   dplyr::summarize(timestamp = timestamp[1],
-                   `got same-wiki results` = any(`some same-wiki results`),
+                   `got same-wiki results` = any(`some same-wiki results`, na.rm = TRUE),
                    engaged = any(event != "searchResultPage") || length(unique(page_id[event == "searchResultPage"])) > 1,
                    `same-wiki clickthrough` = "click" %in% event,
                    `other clickthrough` = sum(grepl("click", event) & event != "click"),
