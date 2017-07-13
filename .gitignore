@@ -57,4 +57,5 @@ test_data/*
 docs/index_cache/*
 docs/index_files/figure-latex/*
 scratch/*
-test.html
+*.html
+test.Rmd

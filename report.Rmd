@@ -9,7 +9,7 @@ params:
   wiki: enwiki
   test group names: [explore_similar_control, explore_similar_test]
   event_action: [searchResultPage, click]
-  event_source: fulltext
+  event_source: fulltext # don't support autocomplete now
 title: "`r params$report_title`"
 date: '`r Sys.Date()`'
 output: html_document
@@ -20,9 +20,9 @@ library(tidyverse)
 source("functions.R")
 ```
 
-```{r sql_setup}
+```{r sql_setup, echo=FALSE, message=FALSE}
 is_stat_machine <- grepl("^stat1", Sys.info()["nodename"])
-if (!is_stat_machine){
+if (!is_stat_machine & is.null(params$data)){
   # create an SSH tunnel. see https://gist.github.com/scy/6781836
   system("ssh -f -o ExitOnForwardFailure=yes stat3 -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
   library(RMySQL)
@@ -67,21 +67,12 @@ ifelse(is.null(params$wiki), "", paste0("  AND wiki IN('", paste(params$wiki, co
 ifelse(is.null(params$`test group names`), "", paste0("  AND event_subTest IN('", paste(params$`test group names`, collapse = "', '"), "') \n")),
 ifelse(is.null(params$event_action), "", paste0("  AND event_action IN('", paste(params$event_action, collapse = "', '"), "') \n")),
 ifelse(is.null(params$event_source), "", paste0("  AND event_source IN('", paste(params$event_source, collapse = "', '"), "') \n")),
-"  AND (
-   (event_action = 'searchResultPage' AND event_msToDisplayResults IS NOT NULL)
-   OR
-   (event_action = 'click' AND event_position IS NOT NULL AND event_position > -1)
-   OR
-   (event_action = 'visitPage' AND event_pageViewId IS NOT NULL)
-   OR
-   (event_action = 'checkin' AND event_checkin IS NOT NULL AND event_pageViewId IS NOT NULL)
-   OR
-   (event_action = 'iwclick' AND event_position IS NOT NULL AND event_position > -1)
-   OR
-   (event_action = 'ssclick' AND event_position IS NOT NULL AND event_position > -1)
-   OR event_action = 'esclick'
-   OR event_action = 'hover-on' OR event_action = 'hover-off'
-   );"
+"  AND CASE WHEN event_action = 'searchResultPage' THEN event_msToDisplayResults IS NOT NULL
+            WHEN event_action IN ('click', 'iwclick', 'ssclick') THEN event_position IS NOT NULL AND event_position > -1
+            WHEN event_action = 'visitPage' THEN event_pageViewId IS NOT NULL
+            WHEN event_action = 'checkin' THEN event_checkin IS NOT NULL AND event_pageViewId IS NOT NULL
+            ELSE TRUE
+       END;"
 )
 if (!is.null(params$query)) {
   query <- params$query
@@ -114,7 +105,7 @@ if (is.null(params$data)){
 ```
 
 ## Data Cleansing
-```{r data_process, echo =FALSE, warning=FALSE}
+```{r data_cleansing, echo =FALSE, warning=FALSE, results='asis'}
 if ("events_raw" %in% ls()) events <- events_raw
 
 # Events may be duplicated
@@ -123,7 +114,7 @@ events <- events %>%
          date = as.Date(timestamp)) %>%
   dplyr::arrange(session_id, event_id, timestamp) %>%
   dplyr::distinct(session_id, event_id, .keep_all = TRUE)
-print(paste0("Deleted ", nrow(events_raw) - nrow(events), " duplicated events."))
+cat(paste0("Deleted ", nrow(events_raw) - nrow(events), " duplicated events. "))
 
 # SERP De-duplication
 SERPs <- events %>%
@@ -143,13 +134,15 @@ events <- events %>%
   dplyr::group_by(session_id) %>%
   dplyr::filter("searchResultPage" %in% event) %>% # remove orphan "visitPage" and "checkin"
   dplyr::ungroup()
-print(paste0("Removed ", n_evnt - nrow(events), " orphan (SERP-less) events.")); rm(n_evnt)
+cat(paste0("Removed ", n_evnt - nrow(events), " orphan (SERP-less) events. ")); rm(n_evnt)
 
 # Remove sessions falling into multiple test groups
 temp <- events %>% group_by(session_id) %>% summarise(unique_group = length(unique(group)) == 1)
-print(paste0("Remove ", sum(!temp$unique_group), " sessions falling into multiple test groups."))
+cat(paste0("Remove ", sum(!temp$unique_group), " sessions falling into multiple test groups. "))
 events <- events %>% filter(session_id %in% temp$session_id[temp$unique_group]); rm(temp)
+```
 
+```{r data_wrangling, echo=FALSE, warning=FALSE}
 # Aggregate by search
 searches <- events %>%
   dplyr::filter(!(is.na(serp_id))) %>% # remove visitPage and checkin events
@@ -168,7 +161,7 @@ searches <- events %>%
   dplyr::ungroup()
 
 # Aggregate by visited page (after clickthrough)
-visitPage_action <- "visitPage" %in% unique(events$event) # users may not select "visitPage" and "checkin" event in query
+visitPage_action <- all(c("visitPage", "checkin") %in% events$event)
 if (visitPage_action){
   visitedPages <- events %>%
     dplyr::arrange(date, session_id, page_id, timestamp) %>%
@@ -179,12 +172,61 @@ if (visitPage_action){
                      scroll = sum(event_scroll) > 0) %>%
     dplyr::ungroup()
   visitedPages$dwell_time[is.na(visitedPages$dwell_time)] <- 0
-  }
+}
+
+## Parse extraParams
+if ("searchResultPage" %in% events$event){
+  # serp offset
+  serp_offset <- events %>%
+    filter(event == "searchResultPage") %>%
+    mutate(offset = unlist(lapply(.$event_extraParams, function(x) parse_extraParams(x, action = "searchResultPage")$offset))) %>%
+    select(session_id, event_id, serp_id, offset)
+
+  # serp interwiki results
+  temp <- events %>%
+    filter(event == "searchResultPage") %>%
+    select(session_id, event_id, serp_id, event_extraParams)
+  serp_iw <- do.call(bind_rows, 
+                     lapply(1:nrow(temp), 
+                            function(x) data.frame(session_id = temp$session_id[x], event_id = temp$event_id[x], serp_id = temp$serp_id[x],
+                                                   parse_extraParams(temp$event_extraParams[x], action = "searchResultPage")$iw))
+                     )
+  rm(temp)
+}
+
+# ssclick
+if ("ssclick" %in% events$event){
+  ssclick_des <- events %>%
+    filter(event == "ssclick") %>%
+    select(session_id, event_id, event_extraParams) %>%
+    mutate(domain = urltools::domain(event_extraParams)) %>%
+    mutate(language = sub("^([a-z]{2}|commons)\\.(wik[a-z]+)\\.org$", "\\1", domain),
+           project = sub("^([a-z]{2}|commons)\\.(wik[a-z]+)\\.org$", "\\2", domain)) %>%
+    mutate(language = ifelse(language == "commons", NA, language),
+           project = ifelse(language == "commons", "commons", project)) %>%
+    select(-event_extraParams, -domain)
+}
+
+# esclick
+if ("esclick" %in% events$event){
+  esclick_result <- events %>%
+    filter(event == "esclick") %>%
+    cbind(., do.call(bind_rows, lapply(.$event_extraParams, parse_extraParams, action =  "esclick"))) %>%
+    select(session_id, event_id, hoverId, section, result)
+}
+
+# hover-on and hover-off
+if (all(c("hover-on", "hover-off") %in% events$event)){
+  hover_over <- events %>%
+    filter(event %in% c("hover-on", "hover-off")) %>%
+    cbind(., do.call(bind_rows, lapply(.$event_extraParams, parse_extraParams, action =  c("hover-on", "hover-off")))) %>%
+    select(session_id, event_id, event, hoverId, section, results)
+}
 ```
 
 ## Data Summary
 
-### Test summary: 
+### Test summary
 ```{r test_summary, echo=FALSE}
 dplyr::data_frame(
   Days = length(unique(events$date)),
@@ -192,14 +234,14 @@ dplyr::data_frame(
   Sessions = length(unique(events$session_id)),
   `Page IDs` = length(unique(events$page_id)),
   `SERP events` = sum(events$event == "searchResultPage"),
-  `Unique search queries` = length(unique(paste(events$session_id, events$query_hash))),
+  `Unique search queries` = length(unique(paste(events$session_id, events$query_hash))), # includes other events besides SERP
   SERPs = length(unique(events$serp_id[!is.na(events$serp_id)])),
   `Same-wiki clicks` = sum(events$event == "click"),
   `Other clicks (sister search etc.)` = sum(grepl("click", events$event) & events$event != "click")
 ) %>% knitr::kable()
 ```
 
-### Number of events:
+### Number of events
 ```{r event_count, echo=FALSE}
 events %>%
   group_by(group, wiki, event) %>%
@@ -207,7 +249,7 @@ events %>%
   knitr::kable()
 ```
 
-### Number of searches:
+### Number of searches
 ```{r searches_summary, echo=FALSE}
 searches %>%
   group_by(`Test group` = group, wiki) %>%
@@ -224,7 +266,7 @@ searches %>%
   knitr::kable()
 ```
 
-### Number of searches with *n* result(s) returned: 
+### Number of searches with *n* same-wiki result(s) returned
 ```{r n_results_summary, echo=FALSE}
 events %>%
   dplyr::filter(event == "searchResultPage") %>%
@@ -235,7 +277,7 @@ events %>%
   knitr::kable()
 ```
 
-`r if(visitPage_action){"### Number of visited pages: "}`
+`r if(visitPage_action){"### Number of visited pages"}`
 ```{r visitPage_summary, eval = visitPage_action, echo = FALSE}
 visitedPages %>%
   dplyr::group_by(`Test group` = group, wiki) %>%
@@ -249,6 +291,65 @@ visitedPages %>%
   } %>%
   dplyr::mutate(`Visited pages` = prettyNum(`Visited pages`, big.mark = ",")) %>%
   knitr::kable()
+```
+
+`r if(exists("serp_offset")){"### Number of SERP events by offset"}`
+```{r serp_offset_summary, eval = exists("serp_offset"), echo = FALSE}
+serp_offset_summary <- serp_offset %>%
+  dplyr::filter(!is.na(offset)) %>%
+  dplyr::group_by(offset) %>%
+  tally %>%
+  dplyr::mutate(offset = paste(offset, "result(s)"))
+output <- serp_offset_summary$n
+names(output) <- serp_offset_summary$offset
+data.frame(`No.Events` = output) %>% t() %>% knitr::kable()
+rm(serp_offset_summary, output)
+```
+
+`r if(exists("serp_iw")){"### Number of SERP events by source and position for sister-search sidebar results"}`
+```{r serp_iw_summary, eval = exists("serp_iw"), echo = FALSE}
+serp_iw %>%
+  dplyr::filter(!is.na(source) & !is.na(position)) %>%
+  dplyr::mutate(position = paste(safe_ordinals(position), "result")) %>%
+  dplyr::group_by(source, position) %>%
+  dplyr::summarise(counts = length(unique(event_id))) %>%
+  xtabs(counts ~ source + position, data = .) %>%
+  addmargins %>%
+  knitr::kable()
+```
+
+`r if(exists("ssclick_des")){"### Number of sister search clicks by language and project"}`
+```{r ssclick_summary, eval = exists("ssclick_des"), echo = FALSE}
+ssclick_des %>%
+  dplyr::group_by(language, project) %>%
+  dplyr::tally() %>%
+  xtabs(n ~ language + project, data = .) %>%
+  addmargins %>%
+  knitr::kable()
+```
+
+`r if(exists("esclick_result")){"### Number of explore similar clicks by section and clicked position"}`
+```{r esclick_summary, eval = exists("esclick_result"), echo = FALSE}
+esclick_result %>%
+  dplyr::filter(!is.na(section) & !is.na(result)) %>%
+  dplyr::mutate(result = paste(safe_ordinals(result + 1), "result")) %>%
+  dplyr::group_by(section, result) %>%
+  dplyr::tally() %>%
+  xtabs(n ~ section + result, data = .) %>%
+  addmargins %>%
+  knitr::kable()
+```
+
+`r if(exists("hover_over")){"### Number of hover-over events by section and number of results"}`
+```{r hover_breakdown, eval = exists("hover_over"), echo = FALSE}
+hover_breakdown <- hover_over %>%
+  dplyr::filter(event == "hover-on") %>%
+  dplyr::group_by(section, results) %>%
+  dplyr::summarise(counts = n()) %>%
+  xtabs(counts ~ section + results, data = .) %>%
+  addmargins
+colnames(hover_breakdown) <- ifelse(colnames(hover_breakdown) == "Sum", "Sum", paste(colnames(hover_breakdown), "result(s)"))
+hover_breakdown %>% knitr::kable()
 ```
 
 ## Test Metrics
