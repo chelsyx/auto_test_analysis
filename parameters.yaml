@@ -5,6 +5,6 @@ start_date: 20170630 # inclusive
 end_date: 20170714 # exclusive
 TSS2 revision number: 16909631
 wiki: enwiki # e.g. [enwiki, frwiki, eswiki]
-test group names: [explore_similar_control, explore_similar_test]
+test_group_names: [explore_similar_control, explore_similar_test]
 event_action: NULL
 event_source: fulltext # we don't support autocomplete now

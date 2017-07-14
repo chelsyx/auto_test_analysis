@@ -5,7 +5,7 @@ query_score <- function(positions, F) { # 0-based positions
     return(0)
   } else {
     positions <- positions[!is.na(positions)] # when operating on 'events' dataset, searchResultPage events won't have positions
-    return(sum(F^positions))
+    return(sum(F ^ positions))
   }
 }
 
@@ -27,12 +27,12 @@ parse_extraParams <- function(extraParams, action){
     }
   } else{
     if (all(action %in% c("searchResultPage"))) {
-      output <- jsonlite::fromJSON(txt=as.character(extraParams))
-      offset <- if(is.null(output$offset)) NA else output$offset
-      iw <- if(is.null(output$iw)) list(source = NA, position = NA) else output$iw
+      output <- jsonlite::fromJSON(txt = as.character(extraParams))
+      offset <- if (is.null(output$offset)) NA else output$offset
+      iw <- if (is.null(output$iw)) list(source = NA, position = NA) else output$iw
       return(list(offset = offset, iw = iw))
     } else{ # "hover-on", "hover-off", "esclick"
-      return(jsonlite::fromJSON(txt=as.character(extraParams)))
+      return(jsonlite::fromJSON(txt = as.character(extraParams)))
     }
   }
 }
