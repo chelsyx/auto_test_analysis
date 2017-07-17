@@ -356,8 +356,8 @@ serp_offset %>%
 `r if(exists("serp_iw")){"#### Number of SERPs' sister-search sidebar results by source and position"}`
 ```{r serp_iw_summary, eval = exists("serp_iw"), echo = FALSE}
 serp_iw %>%
-  dplyr::filter(!is.na(source) & !is.na(position)) %>%
-  dplyr::mutate(position = paste(safe_ordinals(position), "result")) %>%
+  dplyr::mutate(source = ifelse(is.na(source), "NA", source), 
+                position = ifelse(is.na(position), "NA", paste(safe_ordinals(position), "result"))) %>%
   dplyr::group_by(source, position) %>%
   dplyr::summarise(counts = length(unique(event_id))) %>%
   xtabs(counts ~ source + position, data = .) %>%
@@ -368,14 +368,14 @@ serp_iw %>%
 ```{r serp_iw_breakdown, eval = exists("serp_iw"), echo = FALSE, fig.width=11, fig.height=6*length(unique(events$wiki))}
 serp_iw %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
-  dplyr::filter(!is.na(source) & !is.na(position)) %>%
-  dplyr::mutate(position = paste(safe_ordinals(position), "result")) %>%
+  dplyr::mutate(source = ifelse(is.na(source), "NA", source), 
+                position = ifelse(is.na(position), "NA", paste(safe_ordinals(position), "result"))) %>%
   dplyr::group_by(group, wiki, source, position) %>%
   dplyr::summarise(counts = length(unique(event_id))) %>%
   ggplot(aes(x = source, y = counts, fill = group)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_brewer("Test Group", palette = "Set1") +
-  geom_text(aes(label = counts, vjust = -0.5), size = 2.5, 
+  geom_text(aes(label = counts, vjust = -0.5), size = 2, 
             position = position_dodge(width = 1)) +
   labs(y = "Number of SERPs", x = "Source",
        title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki") +
@@ -386,7 +386,7 @@ serp_iw %>%
 ```
 
 `r if(exists("ssclick_des")){"#### Number of sister search clicks by project"}`
-```{r ssclick_summary, eval = exists("ssclick_des"), echo = FALSE, fig.height=6*length(unique(events$wiki))}
+```{r ssclick_project, eval = exists("ssclick_des"), echo = FALSE, fig.height=6*length(unique(events$wiki))}
 ssclick_des %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
   dplyr::group_by(group, wiki, project) %>%
@@ -402,13 +402,49 @@ ssclick_des %>%
   theme(legend.position = "bottom", strip.placement = "outside")
 ```
 
+`r if("ssclick" %in% events$event){"#### Number of sister search clicks by position"}`
+```{r ssclick_position, eval = "ssclick" %in% events$event, echo = FALSE, fig.height=6*length(unique(events$wiki))}
+events %>%
+  dplyr::filter(event == "ssclick") %>%
+  dplyr::group_by(group, wiki, event_position) %>%
+  dplyr::tally() %>%
+  dplyr::mutate(position = paste(safe_ordinals(event_position), "result")) %>%
+  ggplot(aes(x = position, y = n, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer("Test Group", palette = "Set1") +
+  geom_text(aes(label = n, vjust = -0.5),
+            position = position_dodge(width = 1)) +
+  labs(y = "Number of Sister Search Clicks", x = "Clicked Position",
+       title = "Number of sister search clicks by clicked position, test group and wiki") +
+  facet_wrap(~ wiki, nrow = length(unique(events$wiki))) + 
+  theme(legend.position = "bottom", strip.placement = "outside")
+```
+
+`r if("iwclick" %in% events$event){"#### Number of interwiki clicks by position"}`
+```{r iwclick_position, eval = "iwclick" %in% events$event, echo = FALSE, fig.height=6*length(unique(events$wiki))}
+events %>%
+  dplyr::filter(event == "iwclick") %>%
+  dplyr::mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
+  dplyr::group_by(group, wiki, position) %>%
+  dplyr::tally() %>%
+  ggplot(aes(x = position, y = n, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer("Test Group", palette = "Set1") +
+  geom_text(aes(label = n, vjust = -0.5),
+            position = position_dodge(width = 1)) +
+  labs(y = "Number of Interwiki Clicks", x = "Clicked Position",
+       title = "Number of interwiki clicks by clicked position, test group and wiki") +
+  facet_wrap(~ wiki, nrow = length(unique(events$wiki))) + 
+  theme(legend.position = "bottom", strip.placement = "outside")
+```
+
 ### Explore Similar
 
 `r if(exists("esclick_result")){"#### Number of explore similar clicks by section and clicked position"}`
 ```{r esclick_summary, eval = exists("esclick_result"), echo = FALSE}
 esclick_result %>%
-  dplyr::filter(!is.na(section) & !is.na(result)) %>%
-  dplyr::mutate(result = paste(safe_ordinals(result + 1), "result")) %>%
+  dplyr::mutate(section = ifelse(is.na(section), "NA", section), 
+                result = ifelse(is.na(result), "NA", paste(safe_ordinals(result + 1), "result"))) %>%
   dplyr::group_by(section, result) %>%
   dplyr::tally() %>%
   xtabs(n ~ section + result, data = .) %>%
@@ -419,8 +455,8 @@ esclick_result %>%
 ```{r esclick_breakdown, eval = exists("esclick_result"), echo = FALSE, fig.height=6*length(unique(events$wiki))}
 esclick_result %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
-  dplyr::filter(!is.na(section) & !is.na(result)) %>%
-  dplyr::mutate(result = paste(safe_ordinals(result + 1), "result")) %>%
+  dplyr::mutate(section = ifelse(is.na(section), "NA", section), 
+                result = ifelse(is.na(result), "NA", paste(safe_ordinals(result + 1), "result"))) %>%
   dplyr::group_by(group, wiki, section, result) %>%
   dplyr::tally() %>%
   ggplot(aes(x = section, y = n, fill = group)) +
@@ -448,11 +484,12 @@ hover_over %>%
   knitr::kable()
 ```
 
-```{r hover_breakdown, eval = exists("hover_over"), echo = FALSE, fig.height=6*length(unique(events$wiki))}
+```{r hover_breakdown, eval = exists("hover_over"), echo = FALSE, fig.width=11, fig.height=6*length(unique(events$wiki))}
 hover_over %>%
+  dplyr::filter(event == "hover-on") %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
-  dplyr::filter(!is.na(section) & !is.na(results)) %>%
-  dplyr::mutate(results = ifelse(results >= 5, "5+ result(s)", paste(results, "result(s)"))) %>%
+  dplyr::mutate(section = ifelse(is.na(section), "NA", section), 
+                results = ifelse(is.na(results), "NA", ifelse(results >= 5, "5+ result(s)", paste(results, "result(s)")))) %>%
   dplyr::group_by(group, wiki, section, results) %>%
   dplyr::tally() %>%
   ggplot(aes(x = section, y = n, fill = group)) +
@@ -472,7 +509,7 @@ hover_over %>%
 
 ### Same-wiki Zero Results Rate
 
-```{r zrr, echo=FALSE}
+```{r zrr, echo=FALSE, fig.height=6*length(unique(events$wiki))}
 searches %>%
   dplyr::group_by(group, wiki) %>%
   dplyr::summarise(zero = sum(!`got same-wiki results`), n_search = n()) %>%
@@ -494,7 +531,7 @@ searches %>%
 ```
 
 ### Same-wiki Engagement
-```{r engagement, echo=FALSE}
+```{r engagement, echo=FALSE, fig.height=6*length(unique(events$wiki))}
 samewiki_ctr <- searches %>%
   dplyr::filter(`got same-wiki results` == TRUE) %>%
   dplyr::group_by(group, wiki) %>%
@@ -557,7 +594,7 @@ for (this_group in test_group){
 ```
 
 ### First Clicked Result’s Position
-```{r first_clicked, echo=FALSE}
+```{r first_clicked, echo=FALSE, fig.height=6*length(unique(events$wiki))}
 searches %>%
   dplyr::filter(`got same-wiki results` & `same-wiki clickthrough` & !is.na(`first clicked same-wiki results position`)) %>%
   dplyr::mutate(`first clicked result's position` = ifelse(`first clicked same-wiki results position` < 4, safe_ordinals(`first clicked same-wiki results position` + 1), "5th or higher")) %>%

@@ -10,7 +10,10 @@ query_score <- function(positions, F) { # 0-based positions
 }
 
 safe_ordinals <- function(x) {
-  return(vapply(x, toOrdinal::toOrdinal, ""))
+  na_mask <- is.na(x)
+  output <- rep(NA, length(x))
+  output[!na_mask] <- vapply(x[!na_mask], toOrdinal::toOrdinal, "")
+  return(output)
 }
 
 # Parse extraParams
