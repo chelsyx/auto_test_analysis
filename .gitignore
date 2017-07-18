@@ -58,5 +58,3 @@ docs/index_cache/*
 docs/index_files/figure-latex/*
 scratch/
 reports/
-*.html
-test.Rmd

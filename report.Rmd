@@ -1,7 +1,7 @@
 ---
 params: 
   report_title: A/B Test Analysis
-  data: ./data/AB Test Analysis/events_raw_20170703155930.RData
+  data: ./data/AB Test Analysis/events_raw_20170716170323.RData
   query: 'SELECT * FROM TestSearchSatisfaction2_16909631;' 
   start_date: 20170630 # inclusive
   end_date: 20170707 # exclusive
@@ -10,6 +10,7 @@ params:
   test_group_names: [explore_similar_control, explore_similar_test]
   event_action: [searchResultPage, click]
   event_source: fulltext # don't support autocomplete now
+  other_filter: "event_searchSessionId <> 'explore_similar_test'"
 title: "`r params$report_title`"
 date: '`r Sys.Date()`'
 output: 
@@ -17,20 +18,34 @@ output:
     fig_width: 10
     fig_height: 6
     highlight: zenburn
+    keep_md: true
     mathjax: https://tools-static.wmflabs.org/cdnjs/ajax/libs/mathjax/2.6.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML
     md_extensions: +raw_html +markdown_in_html_blocks +tex_math_dollars +fancy_lists +startnum +lists_without_preceding_blankline
+    self_contained: false
     theme: flatly
     toc: true
     toc_float:
-      collapsed: true
-    toc_depth: 4
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
     code_folding: hide
 ---
-
+```{js, echo = FALSE}
+$(function() {
+  /* Lets the user click on the images to view them in full resolution. */
+  $("img").wrap(function() {
+    var link = $('<a/>');
+    link.attr('href', $(this).attr('src'));
+    link.attr('target', '_blank');
+    return link;
+  });
+});
+```
 ```{r setup, echo=FALSE, error=TRUE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(
   error = TRUE, message = FALSE, warning = FALSE
 )
+set.seed(0)
 library(tidyverse)
 source("functions.R")
 ```
@@ -84,6 +99,7 @@ ifelse(is.null(params$wiki), "", paste0("  AND wiki IN('", paste(params$wiki, co
 ifelse(is.null(params$`test_group_names`), "", paste0("  AND event_subTest IN('", paste(params$`test_group_names`, collapse = "', '"), "') \n")),
 ifelse(is.null(params$event_action), "", paste0("  AND event_action IN('", paste(params$event_action, collapse = "', '"), "') \n")),
 ifelse(is.null(params$event_source), "", paste0("  AND event_source IN('", paste(params$event_source, collapse = "', '"), "') \n")),
+ifelse(is.null(params$other_filter), "", paste0("  AND ", params$other_filter, " \n")),
 "  AND CASE WHEN event_action = 'searchResultPage' THEN event_msToDisplayResults IS NOT NULL
             WHEN event_action IN ('click', 'iwclick', 'ssclick') THEN event_position IS NOT NULL AND event_position > -1
             WHEN event_action = 'visitPage' THEN event_pageViewId IS NOT NULL
@@ -172,6 +188,7 @@ searches <- events %>%
                    `other clickthrough` = sum(grepl("click", event) & event != "click"),
                    `no. same-wiki results clicked` = length(unique(event_position[event == "click"])),
                    `first clicked same-wiki results position` = ifelse(`same-wiki clickthrough`, event_position[event == "click"][1], NA), # event_position is 0-based
+                   `max clicked position (same-wiki)` = ifelse(`same-wiki clickthrough`, max(event_position[event == "click"], na.rm = TRUE), NA),
                    `Query score (F=0.1)` = query_score(event_position, 0.1),
                    `Query score (F=0.5)` = query_score(event_position, 0.5),
                    `Query score (F=0.9)` = query_score(event_position, 0.9)) %>%
@@ -187,8 +204,10 @@ if (visitPage_action){
     dplyr::group_by(group, wiki, session_id, page_id) %>%
     dplyr::filter("visitPage" %in% event) %>% # keep only checkin and visitPage action
     dplyr::summarize(timestamp = timestamp[1],
-                     dwell_time = ifelse("checkin" %in% event, max(event_checkin, na.rm = T), 0),
-                     scroll = sum(event_scroll) > 0) %>%
+                     position = na.omit(event_position)[1][1],
+                     dwell_time = ifelse("checkin" %in% event, max(event_checkin, na.rm = TRUE), 0),
+                     scroll = sum(event_scroll) > 0,
+                     status = ifelse(dwell_time == "420", 1, 2)) %>%
     dplyr::ungroup()
   visitedPages$dwell_time[is.na(visitedPages$dwell_time)] <- 0
 }
@@ -526,13 +545,17 @@ searches %>%
        subtitle = "With 95% credible intervals.") +
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"), position = position_dodge(width = 1)) +
-  facet_wrap(~ wiki, ncol = length(unique(events$wiki))) +
-  theme(legend.position = "bottom")
+  facet_wrap(~ wiki, ncol = 3) +
+  theme(legend.position = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
 ```
 
 ### Same-wiki Engagement
 ```{r engagement, echo=FALSE, fig.height=6*length(unique(events$wiki))}
-samewiki_ctr <- searches %>%
+samewiki_ctr <- searches %>% # save object samewiki_ctr for odds ratio plot
   dplyr::filter(`got same-wiki results` == TRUE) %>%
   dplyr::group_by(group, wiki) %>%
   dplyr::summarize(clickthroughs = sum(`same-wiki clickthrough`), n_search = n()) %>%
@@ -540,7 +563,7 @@ samewiki_ctr <- searches %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
   )
-samewiki_ctr %>%
+samewiki_ctr %>% 
   ggplot(aes(x = 1, y = mean, color = group)) +
   geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
   scale_y_continuous(labels = scales::percent_format(), expand = c(0.01, 0.01)) +
@@ -550,8 +573,12 @@ samewiki_ctr %>%
        subtitle = "With 95% credible intervals.") +
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"), position = position_dodge(width = 1)) +
-  facet_wrap(~ wiki, ncol = length(unique(events$wiki))) +
-  theme(legend.position = "bottom")
+  facet_wrap(~ wiki, ncol = 3) +
+  theme(legend.position = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
 ```
 
 ```{r engagement_OR, echo=FALSE, results="asis", include=TRUE}
@@ -593,7 +620,7 @@ for (this_group in test_group){
   }
 ```
 
-### First Clicked Result’s Position
+### First Clicked Same-Wiki Result’s Position
 ```{r first_clicked, echo=FALSE, fig.height=6*length(unique(events$wiki))}
 searches %>%
   dplyr::filter(`got same-wiki results` & `same-wiki clickthrough` & !is.na(`first clicked same-wiki results position`)) %>%
@@ -614,8 +641,135 @@ searches %>%
   scale_color_brewer("Test Group", palette = "Set1") +
   facet_wrap(~ wiki + `first clicked result's position`, ncol = 5, scale = "free_y") +
   labs(x = NULL, y = "Proportion of searches",
-       title = "Position of the first clicked result by test group and wiki",
+       title = "Position of the first clicked same-wiki result by test group and wiki",
        subtitle = "With 95% credible intervals") +
+  theme(legend.position = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+```
+
+### Maximum Clicked Position for Same-Wiki Results
+```{r max_clicked, echo=FALSE, fig.height=6*length(unique(events$wiki))}
+searches %>%
+  dplyr::filter(`got same-wiki results` & `same-wiki clickthrough` & !is.na(`max clicked position (same-wiki)`)) %>%
+  dplyr::mutate(`max clicked position (same-wiki)` = 
+                  dplyr::case_when(`max clicked position (same-wiki)` < 4 ~ safe_ordinals(`max clicked position (same-wiki)` + 1),
+                                   `max clicked position (same-wiki)` >= 4 & `max clicked position (same-wiki)` < 20 ~ "5th - 20th",
+                                   TRUE ~ "21st or higher")) %>%
+  dplyr::group_by(group, wiki, `max clicked position (same-wiki)`) %>%
+  dplyr::summarise(counts = n()) %>%
+  dplyr::mutate(total = sum(counts)) %>%
+  dplyr::ungroup() %>%
+  cbind(
+    as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
+  ) %>%
+  dplyr::mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
+  ggplot(aes(x = 1, y = mean, color = group)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
+  geom_text(aes(label = sprintf("%.1f", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
+            position = position_dodge(width = 1)) +
+  scale_y_continuous(labels = scales::percent_format(),
+                     expand = c(0, 0.005), breaks = seq(0, 1, 0.1)) +
+  scale_color_brewer("Test Group", palette = "Set1") +
+  facet_wrap(~ wiki + `max clicked position (same-wiki)`, ncol = 6, scale = "free_y") +
+  labs(x = NULL, y = "Proportion of searches",
+       title = "Maximum clicked position for same-wiki results, by test group and wiki",
+       subtitle = "With 95% credible intervals") +
+  theme(legend.position = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+```
+
+### PaulScore
+```{r paulscores, echo=FALSE, fig.height=6*ceiling(length(unique(events$wiki))/3)}
+searches %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(`same-wiki clickthrough` == TRUE) %>% 
+  dplyr::select(c(wiki, group, `Query score (F=0.1)`, `Query score (F=0.5)`, `Query score (F=0.9)`)) %>%
+  tidyr::gather(`F value`, `Query score`, -c(group, wiki)) %>%
+  dplyr::mutate(`F value` = sub("^Query score \\(F=(0\\.[159])\\)$", "F = \\1", `F value`)) %>%
+  dplyr::group_by(wiki, group, `F value`) %>%
+  dplyr::summarize(
+    PaulScore = mean(`Query score`),
+    Interval = paste0(quantile(bootstrap_mean(`Query score`, 1000), c(0.025, 0.975)), collapse = ",")
+  ) %>%
+  tidyr::extract(Interval, into = c("Lower", "Upper"), regex = "(.*),(.*)", convert = TRUE) %>%
+  ggplot(aes(x = `F value`, y = PaulScore, color = group)) +
+  geom_pointrange(aes(ymin = Lower, ymax = Upper), position = position_dodge(width = 0.7)) +
+  scale_color_brewer("Test Group", palette = "Set1") +
+  labs(x = NULL, y = "PaulScore",
+       title = "PaulScore by wiki, test group and value of F",
+       subtitle = "With bootstrapped 95% confidence intervals.") +
+  geom_text(aes(label = sprintf("%.3f", PaulScore), y = Upper + 0.01, vjust = "bottom"),
+            position = position_dodge(width = 0.7)) +
+  facet_wrap(~ wiki, ncol = 3) +
+  theme(legend.position = "bottom") 
+```
+
+`r if(exists("serp_offset")){"### Other Pages of the Search Results"}`
+```{r search_offset, eval = exists("serp_offset"), echo = FALSE, fig.height=6*ceiling(length(unique(events$wiki))/3)}
+serp_offset %>%
+  dplyr::group_by(session_id, serp_id) %>%
+  dplyr::summarise(`Any page-turning` = any(offset > 0)) %>%
+  dplyr::right_join(searches, by = c("session_id", "serp_id")) %>%
+  dplyr::group_by(group, wiki) %>%
+  dplyr::summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
+  dplyr::ungroup() %>%
+  cbind(
+    as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
+  ) %>%
+  ggplot(aes(x = 1, y = mean, color = group)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
+  scale_y_continuous(labels = scales::percent_format(), expand = c(0.01, 0.01)) +
+  scale_color_brewer("Test Group", palette = "Set1") +
+  labs(x = NULL, y = "Proportion of searches",
+       title = "Proportion of searches with clicks to see other pages of the search results, by test group and wiki",
+       subtitle = "With 95% credible intervals.") +
+  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
+                y = upper + 0.0025, vjust = "bottom"), position = position_dodge(width = 1)) +
+  facet_wrap(~ wiki, ncol = 3) +
+  theme(legend.position = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank())
+```
+
+`r if(exists("visitedPages")){"### Dwell Time per Visited Page"}`
+```{r dwelltime, eval=exists("visitedPages"), echo=FALSE, fig.height=6*length(unique(events$wiki))}
+temp <- visitedPages
+temp$SurvObj <- with(temp, survival::Surv(dwell_time, status == 2))
+fit <- survival::survfit(SurvObj ~ group + wiki, data = temp)
+ggsurv <- survminer::ggsurvplot(fit, conf.int = TRUE, xlab = "T (Dwell Time in seconds)", ylab = "Proportion of visits longer than T (P%)", 
+                      surv.scale = "percent", palette = "Set1", legend = "bottom", legend.title = "Test Group", legend.labs = params$test_group_names,
+                      ggtheme = theme_bw())
+ggsurv$plot + facet_wrap(~ wiki, ncol = 1) + labs(title = "Survival curves by test group and wiki", subtitle = "With 95% confidence intervals.")
+rm(temp)
+```
+
+`r if(exists("visitedPages")){"### Scroll"}`
+```{r scroll, eval=exists("visitedPages"), echo=FALSE, fig.height=6*ceiling(length(unique(events$wiki))/3)}
+visitedPages %>%
+  dplyr::group_by(group, wiki) %>%
+  dplyr::summarize(scrolls = sum(scroll), n_visit = n()) %>%
+  dplyr::ungroup() %>%
+  cbind(
+    as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
+  ) %>%
+  ggplot(aes(x = 1, y = mean, color = group)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
+  scale_y_continuous(labels = scales::percent_format(), expand = c(0.01, 0.01)) +
+  scale_color_brewer("Test Group", palette = "Set1") +
+  labs(x = NULL, y = "Proportion of visits",
+       title = "Proportion of visits with scroll by test group and wiki",
+       subtitle = "With 95% credible intervals.") +
+  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
+                y = upper + 0.0025, vjust = "bottom"), position = position_dodge(width = 1)) +
+  facet_wrap(~ wiki, ncol = 3) +
   theme(legend.position = "bottom",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank(),

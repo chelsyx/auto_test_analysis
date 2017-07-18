@@ -9,6 +9,15 @@ query_score <- function(positions, F) { # 0-based positions
   }
 }
 
+# Bootstrapping
+bootstrap_mean <- function(x, m, seed = NULL) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  n <- length(x)
+  return(replicate(m, mean(x[sample.int(n, n, replace = TRUE)])))
+}
+
 safe_ordinals <- function(x) {
   na_mask <- is.na(x)
   output <- rep(NA, length(x))

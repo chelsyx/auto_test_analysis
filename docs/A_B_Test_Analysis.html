@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+<meta name="date" content="2017-07-17" />
+
+<title>A/B Test Analysis</title>
+
+<script src="A_B_Test_Analysis_files/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="A_B_Test_Analysis_files/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="A_B_Test_Analysis_files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="A_B_Test_Analysis_files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="A_B_Test_Analysis_files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="A_B_Test_Analysis_files/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="A_B_Test_Analysis_files/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="A_B_Test_Analysis_files/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="A_B_Test_Analysis_files/navigation-1.1/tabsets.js"></script>
+<script src="A_B_Test_Analysis_files/navigation-1.1/codefolding.js"></script>
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; background-color: #303030; color: #cccccc; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; }
+td.sourceCode { padding-left: 5px; }
+pre, code { color: #cccccc; background-color: #303030; }
+code > span.kw { color: #f0dfaf; } /* Keyword */
+code > span.dt { color: #dfdfbf; } /* DataType */
+code > span.dv { color: #dcdccc; } /* DecVal */
+code > span.bn { color: #dca3a3; } /* BaseN */
+code > span.fl { color: #c0bed1; } /* Float */
+code > span.ch { color: #dca3a3; } /* Char */
+code > span.st { color: #cc9393; } /* String */
+code > span.co { color: #7f9f7f; } /* Comment */
+code > span.ot { color: #efef8f; } /* Other */
+code > span.al { color: #ffcfaf; } /* Alert */
+code > span.fu { color: #efef8f; } /* Function */
+code > span.er { color: #c3bf9f; } /* Error */
+code > span.wa { color: #7f9f7f; font-weight: bold; } /* Warning */
+code > span.cn { color: #dca3a3; font-weight: bold; } /* Constant */
+code > span.sc { color: #dca3a3; } /* SpecialChar */
+code > span.vs { color: #cc9393; } /* VerbatimString */
+code > span.ss { color: #cc9393; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { } /* Variable */
+code > span.cf { color: #f0dfaf; } /* ControlFlow */
+code > span.op { color: #f0efd0; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #ffcfaf; font-weight: bold; } /* Preprocessor */
+code > span.at { } /* Attribute */
+code > span.do { color: #7f9f7f; } /* Documentation */
+code > span.an { color: #7f9f7f; font-weight: bold; } /* Annotation */
+code > span.cv { color: #7f9f7f; font-weight: bold; } /* CommentVar */
+code > span.in { color: #7f9f7f; font-weight: bold; } /* Information */
+div.sourceCode {
+  overflow-x: visible;
+}
+</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = false;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+.tocify-subheader {
+  display: inline;
+}
+.tocify-subheader .tocify-item {
+  font-size: 0.95em;
+}
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="fluid-row" id="header">
+
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">A/B Test Analysis</h1>
+<h4 class="date"><em>2017-07-17</em></h4>
+
+</div>
+
+
+<script type="text/javascript">
+$(function() {
+  /* Lets the user click on the images to view them in full resolution. */
+  $("img").wrap(function() {
+    var link = $('<a/>');
+    link.attr('href', $(this).attr('src'));
+    link.attr('target', '_blank');
+    return link;
+  });
+});
+</script>
+<p>This test was run from 2017-06-30 to 2017-07-17 on enwiki. We have 2 test groups: explore_similar_control, explore_similar_test. We include fulltext search in this analysis.</p>
+<p>Fetch data:</p>
+<div class="sourceCode"><pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">SELECT</span>
+  <span class="dt">timestamp</span>,
+  event_uniqueId <span class="kw">AS</span> event_id,
+  event_mwSessionId,
+  event_pageViewId <span class="kw">AS</span> page_id,
+  event_searchSessionId <span class="kw">AS</span> session_id,
+  event_subTest <span class="kw">AS</span> `group`,
+  wiki,
+  MD5(<span class="fu">LOWER</span>(<span class="fu">TRIM</span>(event_query))) <span class="kw">AS</span> query_hash,
+  event_action <span class="kw">AS</span> event,
+  <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> event_position &lt; <span class="dv">0</span> <span class="kw">THEN</span> <span class="kw">NULL</span>
+    <span class="kw">ELSE</span> event_position
+    <span class="kw">END</span> <span class="kw">AS</span> event_position,
+  <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> event_action = <span class="st">&#39;searchResultPage&#39;</span> <span class="kw">AND</span> event_hitsReturned &gt; <span class="dv">0</span> <span class="kw">THEN</span> <span class="st">&#39;TRUE&#39;</span>
+    <span class="kw">WHEN</span> event_action = <span class="st">&#39;searchResultPage&#39;</span> <span class="kw">AND</span> event_hitsReturned <span class="kw">IS</span> <span class="kw">NULL</span> <span class="kw">THEN</span> <span class="st">&#39;FALSE&#39;</span>
+    <span class="kw">ELSE</span> <span class="kw">NULL</span>
+    <span class="kw">END</span> <span class="kw">AS</span> `some same-wiki results`,
+  <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> event_action = <span class="st">&#39;searchResultPage&#39;</span> <span class="kw">AND</span> event_hitsReturned &gt; -<span class="dv">1</span> <span class="kw">THEN</span> event_hitsReturned
+    <span class="kw">WHEN</span> event_action = <span class="st">&#39;searchResultPage&#39;</span> <span class="kw">AND</span> event_hitsReturned <span class="kw">IS</span> <span class="kw">NULL</span> <span class="kw">THEN</span> <span class="dv">0</span>
+    <span class="kw">ELSE</span> <span class="kw">NULL</span>
+    <span class="kw">END</span> <span class="kw">AS</span> n_results,
+  event_scroll,
+  event_checkin,
+  event_extraParams,
+  event_msToDisplayResults <span class="kw">AS</span> load_time,
+  event_searchToken <span class="kw">AS</span> search_token,
+  userAgent <span class="kw">AS</span> user_agent
+<span class="kw">FROM</span> TestSearchSatisfaction2_<span class="dv">16909631</span>
+<span class="kw">WHERE</span> <span class="kw">LEFT</span>(<span class="dt">timestamp</span>, <span class="dv">8</span>) &gt;= <span class="st">&#39;20170630&#39;</span> <span class="kw">AND</span> <span class="kw">LEFT</span>(<span class="dt">timestamp</span>, <span class="dv">8</span>) &lt; <span class="st">&#39;20170718&#39;</span> 
+  <span class="kw">AND</span> wiki <span class="kw">IN</span>(<span class="st">&#39;enwiki&#39;</span>) 
+  <span class="kw">AND</span> event_subTest <span class="kw">IN</span>(<span class="st">&#39;explore_similar_control&#39;</span>, <span class="st">&#39;explore_similar_test&#39;</span>) 
+  <span class="kw">AND</span> event_source <span class="kw">IN</span>(<span class="st">&#39;fulltext&#39;</span>) 
+  <span class="kw">AND</span> event_searchSessionId &lt;&gt; <span class="st">&#39;explore_similar_test&#39;</span> 
+  <span class="kw">AND</span> <span class="kw">CASE</span> <span class="kw">WHEN</span> event_action = <span class="st">&#39;searchResultPage&#39;</span> <span class="kw">THEN</span> event_msToDisplayResults <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>
+            <span class="kw">WHEN</span> event_action <span class="kw">IN</span> (<span class="st">&#39;click&#39;</span>, <span class="st">&#39;iwclick&#39;</span>, <span class="st">&#39;ssclick&#39;</span>) <span class="kw">THEN</span> event_position <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span> <span class="kw">AND</span> event_position &gt; -<span class="dv">1</span>
+            <span class="kw">WHEN</span> event_action = <span class="st">&#39;visitPage&#39;</span> <span class="kw">THEN</span> event_pageViewId <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>
+            <span class="kw">WHEN</span> event_action = <span class="st">&#39;checkin&#39;</span> <span class="kw">THEN</span> event_checkin <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span> <span class="kw">AND</span> event_pageViewId <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>
+            <span class="kw">ELSE</span> <span class="kw">TRUE</span>
+       <span class="kw">END</span>;</code></pre></div>
+<div id="data-cleansing" class="section level2">
+<h2>Data Cleansing</h2>
+<p>Deleted 590 duplicated events. Removed 201 orphan (SERP-less) events. Remove 0 sessions falling into multiple test groups.</p>
+</div>
+<div id="data-summary" class="section level2 tabset">
+<h2>Data Summary</h2>
+<div id="test-summary" class="section level3">
+<h3>Test Summary</h3>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Days</th>
+<th align="left">Events</th>
+<th align="left">Sessions</th>
+<th align="left">Page IDs</th>
+<th align="left">SERPs</th>
+<th align="left">Unique search queries</th>
+<th align="left">Searches</th>
+<th align="left">Same-wiki clicks</th>
+<th align="left">Other clicks</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">18</td>
+<td align="left">30,699</td>
+<td align="left">3,686</td>
+<td align="left">15,547</td>
+<td align="left">13,092</td>
+<td align="left">12,532</td>
+<td align="left">10,617</td>
+<td align="left">2,554</td>
+<td align="left">124</td>
+</tr>
+</tbody>
+</table>
+<div id="number-of-events" class="section level4">
+<h4>Number of events</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/event_count-1.png" /><!-- --></p>
+</div>
+<div id="number-of-searches" class="section level4">
+<h4>Number of searches</h4>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Test group</th>
+<th align="left">wiki</th>
+<th align="left">Search sessions</th>
+<th align="left">Searches recorded</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">explore_similar_control</td>
+<td align="left">enwiki</td>
+<td align="left">1,863</td>
+<td align="left">6,262</td>
+</tr>
+<tr class="even">
+<td align="left">explore_similar_test</td>
+<td align="left">enwiki</td>
+<td align="left">1,823</td>
+<td align="left">4,355</td>
+</tr>
+<tr class="odd">
+<td align="left">Total</td>
+<td align="left">All Wikis</td>
+<td align="left">3,686</td>
+<td align="left">10,617</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="number-of-searches-with-n-same-wiki-results-returned" class="section level4">
+<h4>Number of searches with <em>n</em> same-wiki result(s) returned</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/n_results_summary-1.png" /><!-- --></p>
+</div>
+<div id="number-of-serps-by-offset" class="section level4">
+<h4>Number of SERPs by offset</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/serp_offset_summary-1.png" /><!-- --></p>
+</div>
+</div>
+<div id="sister-search" class="section level3">
+<h3>Sister Search</h3>
+<div id="number-of-serps-sister-search-sidebar-results-by-source-and-position" class="section level4">
+<h4>Number of SERPs’ sister-search sidebar results by source and position</h4>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">1st result</th>
+<th align="right">2nd result</th>
+<th align="right">3rd result</th>
+<th align="right">4th result</th>
+<th align="right">5th result</th>
+<th align="right">NA</th>
+<th align="right">Sum</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>NA</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">3563</td>
+<td align="right">3563</td>
+</tr>
+<tr class="even">
+<td>wikibooks</td>
+<td align="right">1506</td>
+<td align="right">2661</td>
+<td align="right">2841</td>
+<td align="right">536</td>
+<td align="right">6</td>
+<td align="right">0</td>
+<td align="right">7550</td>
+</tr>
+<tr class="odd">
+<td>wikiquote</td>
+<td align="right">1060</td>
+<td align="right">2928</td>
+<td align="right">2249</td>
+<td align="right">673</td>
+<td align="right">8</td>
+<td align="right">0</td>
+<td align="right">6918</td>
+</tr>
+<tr class="even">
+<td>wikisource</td>
+<td align="right">6354</td>
+<td align="right">1369</td>
+<td align="right">545</td>
+<td align="right">109</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">8377</td>
+</tr>
+<tr class="odd">
+<td>wikivoyage</td>
+<td align="right">8</td>
+<td align="right">19</td>
+<td align="right">15</td>
+<td align="right">39</td>
+<td align="right">241</td>
+<td align="right">0</td>
+<td align="right">322</td>
+</tr>
+<tr class="even">
+<td>wiktionary</td>
+<td align="right">601</td>
+<td align="right">841</td>
+<td align="right">751</td>
+<td align="right">2827</td>
+<td align="right">22</td>
+<td align="right">0</td>
+<td align="right">5042</td>
+</tr>
+<tr class="odd">
+<td>Sum</td>
+<td align="right">9529</td>
+<td align="right">7818</td>
+<td align="right">6401</td>
+<td align="right">4184</td>
+<td align="right">277</td>
+<td align="right">3563</td>
+<td align="right">31772</td>
+</tr>
+</tbody>
+</table>
+<p><img src="A_B_Test_Analysis_files/figure-html/serp_iw_breakdown-1.png" /><!-- --></p>
+</div>
+<div id="number-of-sister-search-clicks-by-project" class="section level4">
+<h4>Number of sister search clicks by project</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/ssclick_project-1.png" /><!-- --></p>
+</div>
+<div id="number-of-sister-search-clicks-by-position" class="section level4">
+<h4>Number of sister search clicks by position</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/ssclick_position-1.png" /><!-- --></p>
+</div>
+<div id="number-of-interwiki-clicks-by-position" class="section level4">
+<h4>Number of interwiki clicks by position</h4>
+<p><img src="A_B_Test_Analysis_files/figure-html/iwclick_position-1.png" /><!-- --></p>
+</div>
+</div>
+<div id="explore-similar" class="section level3">
+<h3>Explore Similar</h3>
+<div id="number-of-explore-similar-clicks-by-section-and-clicked-position" class="section level4">
+<h4>Number of explore similar clicks by section and clicked position</h4>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">2nd result</th>
+<th align="right">3rd result</th>
+<th align="right">Sum</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>NA</td>
+<td align="right">1</td>
+<td align="right">0</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td>related</td>
+<td align="right">1</td>
+<td align="right">3</td>
+<td align="right">4</td>
+</tr>
+<tr class="odd">
+<td>Sum</td>
+<td align="right">2</td>
+<td align="right">3</td>
+<td align="right">5</td>
+</tr>
+</tbody>
+</table>
+<p><img src="A_B_Test_Analysis_files/figure-html/esclick_breakdown-1.png" /><!-- --></p>
+</div>
+<div id="number-of-hover-over-events-by-section-and-number-of-results" class="section level4">
+<h4>Number of hover-over events by section and number of results</h4>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">0 result(s)</th>
+<th align="right">1 result(s)</th>
+<th align="right">2 result(s)</th>
+<th align="right">3 result(s)</th>
+<th align="right">4 result(s)</th>
+<th align="right">5+ result(s)</th>
+<th align="right">Sum</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>categories</td>
+<td align="right">0</td>
+<td align="right">16</td>
+<td align="right">21</td>
+<td align="right">24</td>
+<td align="right">27</td>
+<td align="right">80</td>
+<td align="right">168</td>
+</tr>
+<tr class="even">
+<td>languages</td>
+<td align="right">54</td>
+<td align="right">12</td>
+<td align="right">7</td>
+<td align="right">8</td>
+<td align="right">5</td>
+<td align="right">11</td>
+<td align="right">97</td>
+</tr>
+<tr class="odd">
+<td>related</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">222</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">229</td>
+</tr>
+<tr class="even">
+<td>Sum</td>
+<td align="right">61</td>
+<td align="right">28</td>
+<td align="right">28</td>
+<td align="right">254</td>
+<td align="right">32</td>
+<td align="right">91</td>
+<td align="right">494</td>
+</tr>
+</tbody>
+</table>
+<p><img src="A_B_Test_Analysis_files/figure-html/hover_breakdown-1.png" /><!-- --></p>
+</div>
+</div>
+</div>
+<div id="test-metrics" class="section level2">
+<h2>Test Metrics</h2>
+<div id="same-wiki-zero-results-rate" class="section level3">
+<h3>Same-wiki Zero Results Rate</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/zrr-1.png" /><!-- --></p>
+</div>
+<div id="same-wiki-engagement" class="section level3">
+<h3>Same-wiki Engagement</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/engagement-1.png" /><!-- --></p>
+<p><strong>explore_similar_test vs. explore_similar_control</strong> <img src="A_B_Test_Analysis_files/figure-html/engagement_OR-1.png" /><!-- --></p>
+</div>
+<div id="first-clicked-same-wiki-results-position" class="section level3">
+<h3>First Clicked Same-Wiki Result’s Position</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/first_clicked-1.png" /><!-- --></p>
+</div>
+<div id="maximum-clicked-position-for-same-wiki-results" class="section level3">
+<h3>Maximum Clicked Position for Same-Wiki Results</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/max_clicked-1.png" /><!-- --></p>
+</div>
+<div id="paulscore" class="section level3">
+<h3>PaulScore</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/paulscores-1.png" /><!-- --></p>
+</div>
+<div id="other-pages-of-the-search-results" class="section level3">
+<h3>Other Pages of the Search Results</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/search_offset-1.png" /><!-- --></p>
+</div>
+<div id="dwell-time-per-visited-page" class="section level3">
+<h3>Dwell Time per Visited Page</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/dwelltime-1.png" /><!-- --></p>
+</div>
+<div id="scroll" class="section level3">
+<h3>Scroll</h3>
+<p><img src="A_B_Test_Analysis_files/figure-html/scroll-1.png" /><!-- --></p>
+</div>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://tools-static.wmflabs.org/cdnjs/ajax/libs/mathjax/2.6.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

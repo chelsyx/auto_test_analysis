@@ -8,10 +8,12 @@ Install the dependencies in R:
 
 ```R
 install.packages(c("tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "tools",
-  "knitr", "RMySQL", "data.table", "lubridate", "binom"))
+  "knitr", "RMySQL", "data.table", "lubridate", "binom", "survival", "survminer"))
 devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/wmf.git")
 devtools::install_github("bearloga/BCDA")
 ```
+
+The reports should be able to run on local machine and analytic clusters (stat1002 or stat1003). Because of [T168683](https://phabricator.wikimedia.org/T168683), it can only be tested locally now. See [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL Configuration on your local machine.
 
 Specify parameters in `parameters.yaml`. And then in bash, run:
 ```

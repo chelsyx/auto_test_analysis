@@ -3,7 +3,8 @@
 # Check dependencies:
 dependencies <- c(
   "tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "wmf", "tools",
-  "knitr", "RMySQL", "data.table", "lubridate", "binom", "BCDA"
+  "knitr", "RMySQL", "data.table", "lubridate", "binom", "BCDA", "survival", 
+  "survminer"
 )
 
 installed <- as.data.frame(installed.packages(), stringsAsFactors = FALSE)
