@@ -17,7 +17,14 @@ if (any(!dependencies %in% unname(installed$Package))) {
        paste0(dependencies[!dependencies %in% installed$Package], collapse = ", "))
 }
 
-report_params <- yaml::yaml.load_file("parameters.yaml")
+# Get command line options, if help option encountered print help and exit,
+# otherwise if options not found on command line then set defaults:
+suppressPackageStartupMessages({library("optparse")})
+option_list <- list(make_option("--yaml_file", default = "parameters.yaml", action = "store", type = "character",
+                                help = "A yaml file with test parameters is needed to generate the report. Default to 'parameters.yaml'."))
+opt <- parse_args(OptionParser(option_list = option_list))
+
+report_params <- yaml::yaml.load_file(opt$yaml_file)
 if (!dir.exists("reports")) {
   dir.create("reports")
 }

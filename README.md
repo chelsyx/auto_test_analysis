@@ -15,10 +15,10 @@ devtools::install_github("bearloga/BCDA")
 
 The reports could be run on local machine and analytic clusters (stat1005). If you want to use it on local machine, check [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL configuration.
 
-Specify parameters in `parameters.yaml`. And then in bash, run:
+Specify parameters in a yaml file. By default, `parameters.yaml` will be used. And then in bash, run:
 ```
-Rscript run.R
+Rscript run.R --yaml_file=/path/to/your/file.yaml
 ```
 
-For each test(assuming the same title would be used in `parameters.yaml`), directory `/data/report_title/` would be created to store the data fetched from MySQL database. The html reports could be found in the `/reports/` directory.
+For each test(assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The html reports could be found in the `/reports/` directory.
 
