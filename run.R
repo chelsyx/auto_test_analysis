@@ -1,5 +1,9 @@
 #!/usr/bin/env Rscript
 
+if(Sys.info()["nodename"] == "stat1005"){
+  .libPaths("/srv/home/chelsyx/R/x86_64-pc-linux-gnu-library/3.3")
+}
+
 # Check dependencies:
 dependencies <- c(
   "tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "wmf", "tools",

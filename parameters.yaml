@@ -1,4 +1,6 @@
 report_title: A/B Test Analysis
+phab_ticket: T149809
+test_description: "This A/B test will have a test group that will be shown additional information that will be relevant to individual results on the existing search results page. This additional information will be links and metadata of related pages with links to related categories and suggested language links that are similar to the individual search results. A control group will see the currently existing search results page."
 data: NULL # if not NULL, query won't be run and specified dataset will be used
 query: NULL # if not NULL, this query string will overwrite query builder
 start_date: 20170630 # inclusive

@@ -13,7 +13,7 @@ devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/wmf.
 devtools::install_github("bearloga/BCDA")
 ```
 
-The reports should be able to run on local machine and analytic clusters (stat1002 or stat1003). Because of [T168683](https://phabricator.wikimedia.org/T168683), it can only be tested locally now. See [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL Configuration on your local machine.
+The reports could be run on local machine and analytic clusters (stat1005). If you want to use it on local machine, check [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL configuration.
 
 Specify parameters in `parameters.yaml`. And then in bash, run:
 ```
