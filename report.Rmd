@@ -179,7 +179,7 @@ cat(paste0("Remove ", sum(!temp$unique_group), " sessions falling into multiple 
 events <- events %>% filter(session_id %in% temp$session_id[temp$unique_group]); rm(temp)
 
 # Number of wikis in the test
-n_wiki <- n_wiki
+n_wiki <- length(unique(events$wiki))
 ```
 
 ```{r search_data, echo=FALSE}
