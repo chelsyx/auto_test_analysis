@@ -7,7 +7,7 @@ start_date: 20170630 # inclusive
 end_date: 20170718 # exclusive
 TSS2 revision number: 16909631
 wiki: enwiki # e.g. [enwiki, frwiki, eswiki]
-test_group_names: [explore_similar_control, explore_similar_test]
+test_group_names: ['explore_similar_control', 'explore_similar_test']
 event_action: NULL # if not NULL, only specified actions are selected
 event_source: fulltext # we don't support autocomplete now
 other_filter: "event_searchSessionId <> 'explore_similar_test'" # if not NULL, these filters will be appended to WHERE clause
