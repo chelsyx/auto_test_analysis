@@ -1,13 +1,20 @@
 report_title: A/B Test Analysis
 phab_ticket: T149809
-test_description: "This A/B test will have a test group that will be shown additional information that will be relevant to individual results on the existing search results page. This additional information will be links and metadata of related pages with links to related categories and suggested language links that are similar to the individual search results. A control group will see the currently existing search results page."
+test_description: >
+  This A/B test will have a test group that will be shown additional information
+  that will be relevant to individual results on the existing search results page.
+  This additional information will be links and metadata of related pages with
+  links to related categories and suggested language links that are similar to the
+  individual search results. A control group will see the currently existing search
+  results page.
 data: NULL # if not NULL, query won't be run and specified dataset will be used
 query: NULL # if not NULL, this query string will overwrite query builder
 start_date: 20170630 # inclusive
 end_date: 20170718 # exclusive
-TSS2 revision number: 16909631
+tss2_revision: 16909631
 wiki: enwiki # e.g. [enwiki, frwiki, eswiki]
-test_group_names: ['explore_similar_control', 'explore_similar_test']
+test_group_names: [explore_similar_control, explore_similar_test]
 event_action: NULL # if not NULL, only specified actions are selected
-event_source: fulltext # we don't support autocomplete now
+event_source: fulltext # autocomplete not yet supported
 other_filter: "event_searchSessionId <> 'explore_similar_test'" # if not NULL, these filters will be appended to WHERE clause
+debug: true # setting to false hides messages and warnings

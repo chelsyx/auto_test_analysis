@@ -10,6 +10,7 @@ Install the dependencies in R:
 install.packages(c("tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "tools",
   "knitr", "RMySQL", "data.table", "lubridate", "binom", "survival", "survminer"))
 devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/wmf.git")
+devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/polloi.git")
 devtools::install_github("bearloga/BCDA")
 ```
 
@@ -20,5 +21,5 @@ Specify parameters in a yaml file. By default, `parameters.yaml` will be used. A
 Rscript run.R --yaml_file=/path/to/your/file.yaml
 ```
 
-For each test(assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The html reports could be found in the `/reports/` directory.
+For each test (assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The HTML reports could be found in the `/reports/` directory.
 

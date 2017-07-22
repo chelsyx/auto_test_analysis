@@ -58,3 +58,6 @@ docs/index_cache/*
 docs/index_files/figure-latex/*
 scratch/
 reports/
+report_files/
+report.md
+report.html
