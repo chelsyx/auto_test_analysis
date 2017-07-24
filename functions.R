@@ -18,11 +18,19 @@ bootstrap_mean <- function(x, m, seed = NULL) {
   return(replicate(m, mean(x[sample.int(n, n, replace = TRUE)])))
 }
 
+# String utils
 safe_ordinals <- function(x) {
   na_mask <- is.na(x)
   output <- rep(NA, length(x))
   output[!na_mask] <- vapply(x[!na_mask], toOrdinal::toOrdinal, "")
   return(output)
+}
+pluralize <- function(singular, n) {
+  plural <- paste0(singular, "s") # TODO: logic for ending
+  return(c(singular, plural)[(n != 1) + 1])
+}
+Pluralize <- function(n, singular) {
+  return(paste(n, pluralize(singular, n)))
 }
 
 # Parse extraParams
@@ -50,7 +58,22 @@ parse_extraParams <- function(extraParams, action){
   }
 }
 
-theme_min <- function(base_family = "") {
+# ggplot themes
+theme_min <- function(base_family = "", ...) {
   ggplot2::theme_minimal(base_size = 12, base_family = base_family) +
-    ggplot2::theme(legend.position = "bottom", strip.placement = "outside")
+    ggplot2::theme(legend.position = "bottom", strip.placement = "outside", ...)
+}
+theme_facet <- function(base_family = "", border = TRUE, ...) {
+  theme <- theme_min(base_family = base_family, ...) +
+    ggplot2::theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_blank(),
+      strip.background = element_rect(fill = "gray90")
+    )
+  if (border) {
+    theme <- theme + ggplot2::theme(panel.border = element_rect(color = "gray30", fill = NA))
+  }
+  return(theme)
 }
