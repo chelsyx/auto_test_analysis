@@ -8,7 +8,7 @@ if (Sys.info()["nodename"] == "stat1005") {
 dependencies <- c(
   "tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "wmf", "tools",
   "knitr", "RMySQL", "data.table", "lubridate", "binom", "BCDA", "survival",
-  "survminer", "polloi"
+  "survminer", "polloi", "import"
 )
 
 installed <- as.data.frame(installed.packages(), stringsAsFactors = FALSE)

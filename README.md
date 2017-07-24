@@ -8,7 +8,7 @@ Install the dependencies in R:
 
 ```R
 install.packages(c("tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "tools",
-  "knitr", "RMySQL", "data.table", "lubridate", "binom", "survival", "survminer"))
+  "knitr", "RMySQL", "data.table", "lubridate", "binom", "survival", "survminer", "import"))
 devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/wmf.git")
 devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/polloi.git")
 devtools::install_github("bearloga/BCDA")
