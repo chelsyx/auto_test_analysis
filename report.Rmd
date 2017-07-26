@@ -10,7 +10,7 @@ params:
     language links that are similar to the individual search results. A
     control group will see the currently existing search results page.
   data: "./data/Explore similar pages, categories and suggested languages in search results/events_raw_20170724112938.RData"
-  query: "SELECT * FROM TestSearchSatisfaction2_16909631;"
+  query: "SELECT * FROM TestSearchSatisfaction2_16909631 LIMIT 100;"
   start_date: 20170713 # inclusive
   end_date: 20170723 # exclusive
   tss2_revision: 16909631
@@ -420,7 +420,7 @@ events %>%
     y = "Number of Events", x = "Action",
     title = "Number of events by test group and wiki"
   ) +
-  theme_min()
+  theme_facet()
 ```
 
 #### Searches
@@ -483,7 +483,7 @@ events %>%
     y = "Number of searches", x = "Number of same-wiki results returned",
     title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group and wiki"))
   ) +
-  theme_min()
+  theme_facet()
 ```
 
 `r if (exists("serp_offset")) { "#### SERPs by offset" }`
@@ -536,7 +536,7 @@ serp_offset %>%
     title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group and wiki")),
     caption = "This can be regarded as a proxy for users visiting additional pages of their search results."
   ) +
-  theme_min()
+  theme_facet()
 ```
 
 `r if ("user_agent" %in% names(events)) { "#### Browser & OS" }`
@@ -643,7 +643,7 @@ serp_iw %>%
     title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki"
   ) +
   facet_grid(wiki ~ position, scale = "free_y") +
-  theme_min(axis.text.x = element_text(angle = 90))
+  theme_facet(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r serp_iw_na, eval=exists("serp_iw"), echo=FALSE}
@@ -696,7 +696,7 @@ ssclick_des %>%
     title = "Number of sister search clicks by project, test group and wiki"
   ) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  theme_min()
+  theme_facet()
 ```
 
 `r if ("ssclick" %in% events$event) { "#### Clicks by position" }`
@@ -735,7 +735,7 @@ events %>%
     title = "Number of sister search clicks by clicked position, test group and wiki"
   ) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  theme_min()
+  theme_facet()
 ```
 
 `r if ("iwclick" %in% events$event) { "#### Inter-wiki clicks by position" }`
@@ -776,7 +776,7 @@ events %>%
     subtitle = "Inter-wiki results are provided by TextCat language detection"
   ) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  theme_min()
+  theme_facet()
 ```
 
 ### Explore Similar {.tabset}
@@ -838,7 +838,7 @@ esclick_result %>%
     y = "Number of Explore Similar Clicks", x = "Section",
     title = "Number of explore similar clicks by section, clicked position, test group and wiki") +
   facet_grid(wiki ~ result, scale = "free_y") +
-  theme_min(border = FALSE, axis.text.x = element_text(angle = 90))
+  theme_facet(border = FALSE, axis.text.x = element_text(angle = 90))
 ```
 
 `r if (exists("hover_over")) { "#### Hover-overs by section and results" }`
@@ -893,7 +893,7 @@ hover_over %>%
   labs(y = "Number of Hover-Over", x = "Section",
        title = "Number of hover-over events by section, number of results, test group and wiki") +
   facet_grid(wiki ~ results, scale = "free_y") +
-  theme_min(axis.text.x = element_text(angle = 90))
+  theme_facet(axis.text.x = element_text(angle = 90))
 ```
 
 ## Results of Statistical Analysis
@@ -920,7 +920,7 @@ searches %>%
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
-  theme_facet(border = FALSE)
+  theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
 ```{r zrr_wiki, echo=FALSE, eval=n_wiki > 1, fig.height=6*ceiling(n_wiki/3)}
@@ -944,7 +944,7 @@ searches %>%
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ### Same-wiki Engagement
@@ -971,7 +971,7 @@ samewiki_ctr_all %>%
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
-  theme_facet(border = FALSE)
+  theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
 ```{r engagement_OR_all, echo=FALSE, results='asis', include=TRUE}
@@ -1003,7 +1003,7 @@ for (this_group in test_group) {
       title = "How likely test group users were to engage with search results",
       subtitle = "95% credible intervals calculated as Highest Posterior Density (HPD) intervals"
     ) +
-    theme_facet(strip.text.y = element_text(size = 12, angle = 0))
+    theme_facet(strip.text.y = element_text(size = 12, angle = 0), clean_xaxis = TRUE)
   print(this_plot)
   cat("\n")
 }
@@ -1031,7 +1031,7 @@ samewiki_ctr_bywiki %>%
     title = "Same-wiki clickthrough rates by test group and wiki",
     subtitle = "With 95% credible intervals."
   ) +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ```{r engagement_OR_wiki, eval=(n_wiki > 1), echo=FALSE, results='asis', include=TRUE}
@@ -1064,7 +1064,7 @@ for (this_group in test_group) {
       title = "How likely test group users were to engage with search results",
       subtitle = "95% credible intervals calculated as Highest Posterior Density (HPD) intervals"
     ) +
-    theme_facet(strip.text.y = element_text(size = 12, angle = 0))
+    theme_facet(strip.text.y = element_text(size = 12, angle = 0), clean_xaxis = TRUE)
   print(this_plot)
   cat("\n")
 }
@@ -1097,7 +1097,7 @@ searches %>%
   labs(x = NULL, y = "Proportion of searches",
        title = "Position of the first clicked same-wiki result by test group",
        subtitle = "With 95% credible intervals") +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ```{r first_clicked_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
@@ -1127,7 +1127,7 @@ searches %>%
     title = "Position of the first clicked same-wiki result by test group and wiki",
     subtitle = "With 95% credible intervals"
   ) +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ### Maximum Clicked Position for Same-Wiki Results
@@ -1166,7 +1166,7 @@ searches %>%
     title = "Maximum clicked position for same-wiki results, by test group",
     subtitle = "With 95% credible intervals"
   ) +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ```{r max_clicked_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
@@ -1203,7 +1203,7 @@ searches %>%
     title = "Maximum clicked position for same-wiki results, by test group and wiki",
     subtitle = "With 95% credible intervals"
   ) +
-  theme_facet()
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 ### PaulScore
@@ -1268,7 +1268,7 @@ searches %>%
   geom_text(aes(label = sprintf("%.3f", PaulScore), y = Upper + 0.01, vjust = "bottom"),
             position = position_dodge(width = 0.7)) +
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
-  theme_min()
+  theme_facet()
 ```
 
 `r if (exists("serp_offset")) { "### Other Pages of the Search Results" }`
@@ -1296,7 +1296,7 @@ serp_offset %>%
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
-  theme_facet(border = FALSE)
+  theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
 ```{r search_offset_wiki, eval=(exists("serp_offset") & n_wiki > 1), echo=FALSE, fig.height=(6 * ceiling(n_wiki / 3))}
@@ -1323,7 +1323,7 @@ serp_offset %>%
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
-  theme_facet(border = FALSE)
+  theme_facet(clean_xaxis = TRUE)
 ```
 
 `r if (exists("visitedPages")) { "### Dwell Time Per Visited Page" }`
@@ -1364,7 +1364,7 @@ ggsurv <- survminer::ggsurvplot(
   surv.scale = "percent",
   palette = "Set1",
   legend.title = "Group",
-  ggtheme = theme_min()
+  ggtheme = theme_facet()
 )
 ggsurv$plot +
   facet_wrap(~ wiki, ncol = 1, scales = "free_y") +
@@ -1395,7 +1395,7 @@ visitedPages %>%
   geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
-  theme_facet(border = FALSE)
+  theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
 ```{r scroll_wiki, eval=(exists("visitedPages") & n_wiki > 1), echo=FALSE, fig.height=(6 * ceiling(n_wiki / 3))}
@@ -1419,5 +1419,5 @@ visitedPages %>%
                 y = upper + 0.0025, vjust = "bottom"),
             position = position_dodge(width = 1)) +
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
-  theme_facet(border = FALSE)
+  theme_facet(clean_xaxis = TRUE)
 ```
