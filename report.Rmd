@@ -10,6 +10,7 @@ params:
     language links that are similar to the individual search results. A
     control group will see the currently existing search results page.
   data: "./data/Explore similar pages, categories and suggested languages in search results/events_raw_20170724112938.RData"
+  query: "SELECT * FROM TestSearchSatisfaction2_16909631;"
   start_date: 20170713 # inclusive
   end_date: 20170723 # exclusive
   tss2_revision: 16909631
@@ -61,7 +62,7 @@ div.tab-content a[role=tab] {
   color: #BC1838;
 }
 ```
-```{r setup, echo=TRUE, error=TRUE, message=params$debug, warning=params$debug}
+```{r setup, echo=FALSE, error=TRUE, message=params$debug, warning=params$debug}
 ############## Read parameters for debugging ################
 if (length(rmarkdown::metadata) == 0) {
   params <- rmarkdown::yaml_front_matter("report.Rmd")$params
@@ -416,7 +417,7 @@ events %>%
   geom_text(aes(label = n, vjust = -0.5), position = position_dodge(width = 1)) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   labs(
-    y = "Number of Events", x = "Action Type",
+    y = "Number of Events", x = "Action",
     title = "Number of events by test group and wiki"
   ) +
   theme_min()
@@ -480,7 +481,7 @@ events %>%
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   labs(
     y = "Number of searches", x = "Number of same-wiki results returned",
-    title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group"))
+    title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group and wiki"))
   ) +
   theme_min()
 ```
@@ -532,7 +533,7 @@ serp_offset %>%
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   labs(
     y = "Number of SERPs", x = "Offset",
-    title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group")),
+    title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group and wiki")),
     caption = "This can be regarded as a proxy for users visiting additional pages of their search results."
   ) +
   theme_min()
@@ -623,7 +624,7 @@ serp_iw %>%
     title = "Number of SERPs' sister-search sidebar results by source, position and test group"
   ) +
   facet_wrap(~ position, scale = "free_y") +
-  theme_facet(axis.text.x = element_text(angle = 90))
+  theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r serp_iw_breakdown_wiki, eval=(exists("serp_iw") & n_wiki > 1), echo=FALSE, fig.width=11, fig.height=(6 * n_wiki)}
@@ -642,7 +643,24 @@ serp_iw %>%
     title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki"
   ) +
   facet_grid(wiki ~ position, scale = "free_y") +
-  theme_facet(axis.text.x = element_text(angle = 90))
+  theme_min(axis.text.x = element_text(angle = 90))
+```
+
+```{r serp_iw_na, eval=exists("serp_iw"), echo=FALSE}
+serp_iw %>%
+  keep_where(is.na(source), is.na(position)) %>%
+  dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
+  group_by(group, wiki) %>%
+  summarize(counts = length(unique(event_id))) %>%
+  ggplot(aes(x = wiki, y = counts, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer("Group", palette = "Set1") +
+  geom_text(aes(label = counts, vjust = -0.5), size = 2, position = position_dodge(width = 1)) +
+  labs(
+    y = "Number of SERPs", x = "Wiki",
+    title = "Number of SERPs without sister-search sidebar results, by test group and wiki"
+  ) +
+  theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 `r if (exists("ssclick_des")) { "#### Clicks by project" }`
@@ -683,7 +701,7 @@ ssclick_des %>%
 
 `r if ("ssclick" %in% events$event) { "#### Clicks by position" }`
 
-```{r ssclick_position_all, eval="ssclick" %in% events$event, echo=FALSE}
+```{r ssclick_position_all, eval=("ssclick" %in% events$event), echo=FALSE}
 events %>%
   keep_where(event == "ssclick") %>%
   group_by(group, event_position) %>%
@@ -738,7 +756,7 @@ events %>%
     title = "Number of inter-wiki clicks by clicked position and test group",
     subtitle = "Inter-wiki results are provided by TextCat language detection"
   ) +
-  theme_facet()
+  theme_min()
 ```
 
 ```{r iwclick_position_wiki, eval=("iwclick" %in% events$event & n_wiki > 1), echo=FALSE, fig.height=(5 * n_wiki)}
@@ -758,7 +776,7 @@ events %>%
     subtitle = "Inter-wiki results are provided by TextCat language detection"
   ) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  theme_facet()
+  theme_min()
 ```
 
 ### Explore Similar {.tabset}
@@ -820,7 +838,7 @@ esclick_result %>%
     y = "Number of Explore Similar Clicks", x = "Section",
     title = "Number of explore similar clicks by section, clicked position, test group and wiki") +
   facet_grid(wiki ~ result, scale = "free_y") +
-  theme_facet(border = FALSE, axis.text.x = element_text(angle = 90))
+  theme_min(border = FALSE, axis.text.x = element_text(angle = 90))
 ```
 
 `r if (exists("hover_over")) { "#### Hover-overs by section and results" }`
@@ -855,7 +873,7 @@ hover_over %>%
     title = "Number of hover-over events by section, number of results and test group"
   ) +
   facet_wrap(~ results, scale = "free_y") +
-  theme_facet(axis.text.x = element_text(angle = 90))
+  theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r hover_breakdown_wiki, eval=(exists("hover_over") & n_wiki > 1), echo=FALSE, fig.width=11, fig.height=(6 * n_wiki)}
@@ -875,7 +893,7 @@ hover_over %>%
   labs(y = "Number of Hover-Over", x = "Section",
        title = "Number of hover-over events by section, number of results, test group and wiki") +
   facet_grid(wiki ~ results, scale = "free_y") +
-  theme_facet(axis.text.x = element_text(angle = 90))
+  theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ## Results of Statistical Analysis
@@ -1346,7 +1364,7 @@ ggsurv <- survminer::ggsurvplot(
   surv.scale = "percent",
   palette = "Set1",
   legend.title = "Group",
-  ggtheme = theme_facet()
+  ggtheme = theme_min()
 )
 ggsurv$plot +
   facet_wrap(~ wiki, ncol = 1, scales = "free_y") +
