@@ -70,10 +70,13 @@ theme_facet <- function(base_family = "", border = TRUE, clean_xaxis = FALSE, ..
     theme <- theme + ggplot2::theme(panel.border = element_rect(color = "gray30", fill = NA))
   }
   if (clean_xaxis) {
-    theme <- theme + ggplot2::theme(panel.grid.major.x = element_blank(),
-                                    panel.grid.minor.x = element_blank(),
-                                    axis.ticks.x = element_blank(),
-                                    axis.text.x = element_blank())
+    theme <- theme +
+      ggplot2::theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()
+      )
   }
   return(theme)
 }
