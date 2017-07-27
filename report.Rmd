@@ -39,8 +39,8 @@ output:
     theme: flatly
     highlight: zenburn
     # Files
-    self_contained: false
-    keep_md: true
+    self_contained: true
+    keep_md: false
     # Extras
     mathjax: https://tools-static.wmflabs.org/cdnjs/ajax/libs/mathjax/2.6.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML
     md_extensions: +raw_html +markdown_in_html_blocks +tex_math_dollars +fancy_lists +startnum +lists_without_preceding_blankline -autolink_bare_uris

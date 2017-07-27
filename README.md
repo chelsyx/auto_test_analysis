@@ -21,5 +21,4 @@ Specify parameters in a yaml file. By default, `parameters.yaml` will be used. A
 Rscript run.R --yaml_file=/path/to/your/file.yaml
 ```
 
-For each test (assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The HTML reports could be found in the `/reports/` directory.
-
+For each test (assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The HTML reports could be found in the `/reports/` directory. With `--publish`, the report can be viewed at https://analytics.wikimedia.org/datasets/discovery/reports/your_report_title.html. If you want to publish the report from local machine, you have to provide your LDAP username by `--username=your_LDAP_username` (default to NULL).

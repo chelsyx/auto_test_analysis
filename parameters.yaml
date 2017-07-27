@@ -12,9 +12,9 @@ query: NULL # if not NULL, this query string will overwrite query builder
 start_date: 20170630 # inclusive
 end_date: 20170718 # exclusive
 tss2_revision: 16909631
-wiki: enwiki # e.g. [enwiki, frwiki, eswiki]
+wiki: enwiki # if not NULL, only specified wikis are included
 test_group_names: [explore_similar_control, explore_similar_test]
 event_action: NULL # if not NULL, only specified actions are selected
 event_source: fulltext # autocomplete not yet supported
 other_filter: "event_searchSessionId <> 'explore_similar_test'" # if not NULL, these filters will be appended to WHERE clause
-debug: true # setting to false hides messages and warnings
+debug: false # setting to false hides messages and warnings
