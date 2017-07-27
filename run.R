@@ -34,20 +34,23 @@ report_params <- yaml::yaml.load_file(opt$yaml_file)
 if (!dir.exists("reports")) {
   dir.create("reports")
 }
-output_report_name <- file.path("reports", paste0(gsub("[^a-zA-Z0-9]", "_", report_params$report_title),".html"))
+output_report_name <- file.path("reports", paste0(gsub("[^a-zA-Z0-9]", "_", report_params$report_title), ".html"))
 
 rmarkdown::render("report.Rmd", output_file = output_report_name, params = report_params)
 
 # Publish
-if (opt$publish){
+if (opt$publish) {
   tryCatch({
     if (Sys.info()["nodename"] == "stat1005") {
       system(paste0("cp ", output_report_name, " /srv/published-datasets/discovery/reports"))
     } else {
-      if(is.null(opt$username)) stop("Your LDAP username is needed to publish the report from local machine!")
+      if (is.null(opt$username)) {
+        stop("Your LDAP username is needed to publish the report from local machine!")
+      }
       system(paste0("scp ", output_report_name, " ", opt$username, "@stat1005.eqiad.wmnet:/srv/published-datasets/discovery/reports"), intern = TRUE)
     }
-  }, warning = function(w) {
+  },
+  warning = function(w) {
     stop("Publish failed! The HTML report could be found in the '/reports' directory.")
   }
   )
