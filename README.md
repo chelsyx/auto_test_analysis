@@ -4,7 +4,7 @@ The idea is to create an A/B test analysis/report template that allows data anal
 
 ## Use
 
-Install the dependencies in R:
+The reports could be run on local machine and analytic clusters (stat1005). If you want to use it on local machine, check [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL configuration and install the dependencies in R (no need if you run on stat1005):
 
 ```R
 install.packages(c("tidyverse", "toOrdinal", "jsonlite", "yaml", "rmarkdown", "tools",
@@ -13,8 +13,6 @@ devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/wmf.
 devtools::install_git("https://gerrit.wikimedia.org/r/p/wikimedia/discovery/polloi.git")
 devtools::install_github("bearloga/BCDA")
 ```
-
-The reports could be run on local machine and analytic clusters (stat1005). If you want to use it on local machine, check [here](https://people.wikimedia.org/~bearloga/notes/rnotebook-eventlogging.html) for MySQL configuration.
 
 Specify parameters in a yaml file. By default, `parameters.yaml` will be used. And then in bash, run:
 ```

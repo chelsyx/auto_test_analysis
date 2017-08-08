@@ -80,3 +80,26 @@ theme_facet <- function(base_family = "", border = TRUE, clean_xaxis = FALSE, ..
   }
   return(theme)
 }
+
+# Bar chart
+bar_chart <- function(data = NULL, x, y, geom_text_size = 3, x_lab = NULL, y_lab = NULL, title = NULL, caption = NULL, subtitle = NULL, ...) {
+  ggplot2::ggplot(data = data, aes_string(x = x, y = y, fill = "group")) +
+    ggplot2::geom_bar(stat = "identity", position = "dodge") +
+    ggplot2::scale_fill_brewer("Group", palette = "Set1") +
+    ggplot2::scale_y_continuous(labels = polloi::compress) +
+    ggplot2::geom_text(aes_string(label = y, vjust = -0.5), position = position_dodge(width = 1), size = geom_text_size) +
+    ggplot2::labs(y = y_lab, x = x_lab, title = title, subtitle = subtitle, caption = caption)
+}
+
+# Point range chart
+pointrange_chart <- function(data = NULL, y_lab = NULL, title = NULL, caption = NULL, subtitle = NULL, ...) {
+  ggplot2::ggplot(data = data, aes(x = 1, y = mean, color = group)) +
+    ggplot2::geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
+    ggplot2::scale_y_continuous(labels = scales::percent_format()) +
+    ggplot2::scale_color_brewer("Group", palette = "Set1") +
+    ggplot2::labs(x = NULL, y = y_lab, title = title, subtitle = subtitle) +
+    ggplot2::geom_text(
+      aes(label = sprintf("%.2f%%", 100 * mean), y = upper + 0.0025, vjust = "bottom"), 
+      position = position_dodge(width = 1)
+      )
+}

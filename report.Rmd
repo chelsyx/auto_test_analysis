@@ -395,15 +395,7 @@ Select one of these sub-tabs:
 events %>%
   group_by(group, event) %>%
   tally %>%
-  ggplot(aes(x = event, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  scale_y_continuous(labels = polloi::compress) +
-  geom_text(aes(label = n, vjust = -0.5), position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of events", x = "Action",
-    title = "Number of events by test group"
-  ) +
+  bar_chart(x = "event", y = "n", x_lab = "Action", y_lab = "Number of events", title = "Number of events by test group") +
   theme_min()
 ```
 
@@ -411,16 +403,9 @@ events %>%
 events %>%
   group_by(group, wiki, event) %>%
   tally %>%
-  ggplot(aes(x = event, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), position = position_dodge(width = 1)) +
-  facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  labs(
-    y = "Number of Events", x = "Action",
-    title = "Number of events by test group and wiki"
-  ) +
-  theme_facet()
+  bar_chart(x = "event", y = "n", x_lab = "Action", y_lab = "Number of events", title = "Number of events by test group and wiki") +
+  theme_facet() +
+  facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 #### Searches
@@ -455,15 +440,8 @@ events %>%
   mutate(results = if_else(n_results >= 5, "5+ results", Pluralize(n_results, "result"))) %>%
   group_by(group, results) %>%
   summarize(searches = length(unique(serp_id[!is.na(serp_id)]))) %>%
-  ggplot(aes(x = results, y = searches, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  scale_y_continuous(labels = polloi::compress) +
-  geom_text(aes(label = searches, vjust = -0.5), position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of searches", x = "Number of same-wiki results returned",
-    title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group"))
-  ) +
+  bar_chart(x = "results", y = "searches", x_lab = "Number of same-wiki results returned", 
+            y_lab = "Number of searches", title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group"))) +
   theme_min()
 ```
 
@@ -473,17 +451,9 @@ events %>%
   mutate(results = if_else(n_results >= 5, "5+ results", Pluralize(n_results, "result"))) %>%
   group_by(group, wiki, results) %>%
   summarize(searches = length(unique(serp_id[!is.na(serp_id)]))) %>%
-  ggplot(aes(x = results, y = searches, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  scale_y_continuous(labels = polloi::compress) +
-  geom_text(aes(label = searches, vjust = -0.5), position = position_dodge(width = 1)) +
-  facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  labs(
-    y = "Number of searches", x = "Number of same-wiki results returned",
-    title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group and wiki"))
-  ) +
-  theme_facet()
+  bar_chart(x = "results", y = "searches", x_lab = "Number of same-wiki results returned", 
+            y_lab = "Number of searches", title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group and wiki"))) +
+  theme_facet() + ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 `r if (exists("serp_offset")) { "#### SERPs by offset" }`
@@ -499,17 +469,10 @@ serp_offset %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
   group_by(group, offset) %>%
   tally %>%
-  ggplot(aes(x = offset, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
+  bar_chart(x = "offset", y = "n", x_lab = "Offset", y_lab = "Number of SERPs", 
+            title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group")),
+            caption = "This can be regarded as a proxy for users visiting additional pages of their search results.") +
   scale_x_discrete(limits = c("No offset (page 1)", Pluralize(c(20, 40, 60, 80), "result"), "100+ results")) +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of SERPs", x = "Offset",
-    title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group")),
-    caption = "This can be regarded as a proxy for users visiting additional pages of their search results."
-  ) +
   theme_min()
 ```
 
@@ -524,19 +487,11 @@ serp_offset %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
   group_by(group, wiki, offset) %>%
   tally %>%
-  ggplot(aes(x = offset, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
+  bar_chart(x = "offset", y = "n", x_lab = "Offset", 
+            y_lab = "Number of SERPs", title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group and wiki")),
+            caption = "This can be regarded as a proxy for users visiting additional pages of their search results.") +
   scale_x_discrete(limits = c("No offset (page 1)", Pluralize(c(20, 40, 60, 80), "result"), "100+ results")) +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
-  labs(
-    y = "Number of SERPs", x = "Offset",
-    title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group and wiki")),
-    caption = "This can be regarded as a proxy for users visiting additional pages of their search results."
-  ) +
-  theme_facet()
+  theme_facet() + ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 `r if ("user_agent" %in% names(events)) { "#### Browser & OS" }`
@@ -608,21 +563,15 @@ serp_iw %>%
   knitr::kable()
 ```
 
-```{r serp_iw_breakdown_all, eval=exists("serp_iw"), echo=FALSE}
+```{r serp_iw_breakdown_all, eval=exists("serp_iw"), echo=FALSE, fig.height=8}
 serp_iw %>%
   keep_where(!is.na(source), !is.na(position)) %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
   mutate(position = paste(safe_ordinals(position), "result")) %>%
   group_by(group, source, position) %>%
   summarize(counts = length(unique(event_id))) %>%
-  ggplot(aes(x = source, y = counts, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = counts, vjust = -0.5), size = 2, position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of SERPs", x = "Source",
-    title = "Number of SERPs' sister-search sidebar results by source, position and test group"
-  ) +
+  bar_chart(x = "source", y = "counts", x_lab = "Source", y_lab = "Number of SERPs", geom_text_size = 2, 
+            title = "Number of SERPs' sister-search sidebar results by source, position and test group") + 
   facet_wrap(~ position, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
@@ -634,14 +583,8 @@ serp_iw %>%
   mutate(position = paste(safe_ordinals(position), "result")) %>%
   group_by(group, wiki, source, position) %>%
   summarize(counts = length(unique(event_id))) %>%
-  ggplot(aes(x = source, y = counts, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = counts, vjust = -0.5), size = 2, position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of SERPs", x = "Source",
-    title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki"
-  ) +
+  bar_chart(x = "source", y = "counts", x_lab = "Source", y_lab = "Number of SERPs", geom_text_size = 2, 
+            title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki") + 
   facet_grid(wiki ~ position, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -652,14 +595,8 @@ serp_iw %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
   group_by(group, wiki) %>%
   summarize(counts = length(unique(event_id))) %>%
-  ggplot(aes(x = wiki, y = counts, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = counts, vjust = -0.5), size = 2, position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of SERPs", x = "Wiki",
-    title = "Number of SERPs without sister-search sidebar results, by test group and wiki"
-  ) +
+  bar_chart(x = "wiki", y = "counts", x_lab = "Wiki", y_lab = "Number of SERPs", 
+            title = "Number of SERPs without sister-search sidebar results, by test group and wiki") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
@@ -670,14 +607,8 @@ ssclick_des %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
   group_by(group, project) %>%
   tally %>%
-  ggplot(aes(x = project, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Sister Search Clicks", x = "Project",
-    title = "Number of sister search clicks by project and test group"
-  ) +
+  bar_chart(x = "project", y = "n", x_lab = "Project", y_lab = "Number of Sister Search Clicks", 
+            title = "Number of sister search clicks by project and test group") +
   theme_min()
 ```
 
@@ -686,15 +617,8 @@ ssclick_des %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
   group_by(group, wiki, project) %>%
   tally %>%
-  ggplot(aes(x = project, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Sister Search Clicks", x = "Project",
-    title = "Number of sister search clicks by project, test group and wiki"
-  ) +
+  bar_chart(x = "project", y = "n", x_lab = "Project", y_lab = "Number of Sister Search Clicks", 
+            title = "Number of sister search clicks by project, test group and wiki") + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -707,15 +631,8 @@ events %>%
   group_by(group, event_position) %>%
   tally %>%
   mutate(position = paste(safe_ordinals(event_position), "result")) %>%
-  ggplot(aes(x = position, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Sister Search Clicks", x = "Clicked Position",
-    title = "Number of sister search clicks by clicked position and test group"
-  ) +
+  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of Sister Search Clicks", 
+            title = "Number of sister search clicks by clicked position and test group") + 
   theme_min()
 ```
 
@@ -725,15 +642,8 @@ events %>%
   group_by(group, wiki, event_position) %>%
   tally %>%
   mutate(position = paste(safe_ordinals(event_position), "result")) %>%
-  ggplot(aes(x = position, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Sister Search Clicks", x = "Clicked Position",
-    title = "Number of sister search clicks by clicked position, test group and wiki"
-  ) +
+  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of Sister Search Clicks", 
+            title = "Number of sister search clicks by clicked position, test group and wiki") + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -746,16 +656,9 @@ events %>%
   mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
   group_by(group, position) %>%
   tally %>%
-  ggplot(aes(x = position, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of inter-wiki clicks", x = "Clicked Position",
-    title = "Number of inter-wiki clicks by clicked position and test group",
-    subtitle = "Inter-wiki results are provided by TextCat language detection"
-  ) +
+  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of inter-wiki clicks", 
+            title = "Number of inter-wiki clicks by clicked position and test group", 
+            subtitle = "Inter-wiki results are provided by TextCat language detection") + 
   theme_min()
 ```
 
@@ -765,16 +668,9 @@ events %>%
   mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
   group_by(group, wiki, position) %>%
   tally %>%
-  ggplot(aes(x = position, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5),
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of inter-wiki clicks", x = "Clicked Position",
-    title = "Number of inter-wiki clicks by clicked position, test group, and wiki",
-    subtitle = "Inter-wiki results are provided by TextCat language detection"
-  ) +
+  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of inter-wiki clicks", 
+            title = "Number of inter-wiki clicks by clicked position, test group, and wiki", 
+            subtitle = "Inter-wiki results are provided by TextCat language detection") + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -807,15 +703,8 @@ esclick_result %>%
   ) %>%
   group_by(group, section, result) %>%
   tally %>%
-  ggplot(aes(x = section, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), size = 2.5,
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Explore Similar Clicks", x = "Section",
-    title = "Number of explore similar clicks by section, clicked position and test group"
-  ) +
+  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
+            title = "Number of explore similar clicks by section, clicked position and test group") + 
   facet_wrap(~ result, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
@@ -829,14 +718,8 @@ esclick_result %>%
   ) %>%
   group_by(group, wiki, section, result) %>%
   tally %>%
-  ggplot(aes(x = section, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), size = 2.5,
-            position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Explore Similar Clicks", x = "Section",
-    title = "Number of explore similar clicks by section, clicked position, test group and wiki") +
+  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
+            title = "Number of explore similar clicks by section, clicked position, test group and wiki") + 
   facet_grid(wiki ~ result, scale = "free_y") +
   theme_facet(border = FALSE, axis.text.x = element_text(angle = 90))
 ```
@@ -854,7 +737,7 @@ hover_over %>%
   knitr::kable()
 ```
 
-```{r hover_breakdown_all, eval=exists("hover_over"), echo=FALSE}
+```{r hover_breakdown_all, eval=exists("hover_over"), echo=FALSE, fig.height=8}
 hover_over %>%
   keep_where(event == "hover-on") %>%
   dplyr::left_join(events, by = c("session_id", "event_id")) %>%
@@ -864,14 +747,8 @@ hover_over %>%
   ) %>%
   group_by(group, section, results) %>%
   tally %>%
-  ggplot(aes(x = section, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), size = 2.5, position = position_dodge(width = 1)) +
-  labs(
-    y = "Number of Hover-Over", x = "Section",
-    title = "Number of hover-over events by section, number of results and test group"
-  ) +
+  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Hover-Over", geom_text_size = 2.5, 
+            title = "Number of hover-over events by section, number of results and test group") + 
   facet_wrap(~ results, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
@@ -886,12 +763,8 @@ hover_over %>%
   ) %>%
   group_by(group, wiki, section, results) %>%
   tally %>%
-  ggplot(aes(x = section, y = n, fill = group)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = n, vjust = -0.5), size = 2.5, position = position_dodge(width = 1)) +
-  labs(y = "Number of Hover-Over", x = "Section",
-       title = "Number of hover-over events by section, number of results, test group and wiki") +
+  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Hover-Over", geom_text_size = 2.5, 
+            title = "Number of hover-over events by section, number of results, test group and wiki") + 
   facet_grid(wiki ~ results, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -908,18 +781,8 @@ searches %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Zero Results Rate",
-    title = "Proportion of searches that did not yield any same-wiki results, by test group",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Zero Results Rate", title = "Proportion of searches that did not yield any same-wiki results, by test group",
+                   subtitle = "With 95% credible intervals.") + 
   theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
@@ -931,18 +794,8 @@ searches %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Zero Results Rate",
-    title = "Proportion of searches that did not yield any same-wiki results, by test group and wiki",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Zero Results Rate", title = "Proportion of searches that did not yield any same-wiki results, by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet(clean_xaxis = TRUE)
 ```
@@ -959,18 +812,8 @@ samewiki_ctr_all <- searches %>% # save object samewiki_ctr_all for odds ratio p
     as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
   )
 samewiki_ctr_all %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Clickthrough rate",
-    title = "Same-wiki clickthrough rates by test group",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Clickthrough rate", title = "Same-wiki clickthrough rates by test group",
+                   subtitle = "With 95% credible intervals.") + 
   theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
@@ -991,13 +834,10 @@ for (this_group in test_group) {
       labels = c("Pr[Control Engaging]", "Pr[Test Engaging]", "Pr[Test] - Pr[Control]", "Relative Risk", "Odds Ratio")
     )) %>%
     ggplot(aes(x = 1, y = estimate, ymin = conf.low, ymax = conf.high)) +
-    geom_segment(y = 1, yend = 1, x = 0.99, xend = 1.05, linetype = "dashed", color = "gray40") +
-    geom_segment(y = 0, yend = 0, x = 0.99, xend = 1.05, linetype = "dashed", color = "gray40") +
     geom_pointrange() +
-    geom_text(aes(label = round(estimate, 4), y = estimate,
-                  hjust = "left"), nudge_x = 0.005) +
+    geom_text(aes(label = round(estimate, 4), y = estimate, hjust = "left"), nudge_x = 0.005) +
     facet_grid(term ~ ., scales = "free_y") +
-    scale_x_continuous(limits = c(0.99, 1.05)) +
+    scale_x_continuous(limits = c(0.99, 1.02)) +
     labs(
       x = NULL, y = "Estimate",
       title = "How likely test group users were to engage with search results",
@@ -1019,18 +859,9 @@ samewiki_ctr_bywiki <- searches %>% # save object samewiki_ctr_bywiki for odds r
     as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
   )
 samewiki_ctr_bywiki %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"), position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Clickthrough rate", title = "Same-wiki clickthrough rates by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
-  labs(
-    x = NULL, y = "Clickthrough rate",
-    title = "Same-wiki clickthrough rates by test group and wiki",
-    subtitle = "With 95% credible intervals."
-  ) +
   theme_facet(clean_xaxis = TRUE)
 ```
 
@@ -1052,13 +883,11 @@ for (this_group in test_group) {
       labels = c("Pr[Control Engaging]", "Pr[Test Engaging]", "Pr[Test] - Pr[Control]", "Relative Risk", "Odds Ratio")
     )) %>%
     ggplot(aes(x = 1, y = estimate, ymin = conf.low, ymax = conf.high)) +
-    geom_segment(y = 1, yend = 1, x = 0.99, xend = 1.05, linetype = "dashed", color = "gray40") +
-    geom_segment(y = 0, yend = 0, x = 0.99, xend = 1.05, linetype = "dashed", color = "gray40") +
     geom_pointrange() +
     geom_text(aes(label = round(estimate, 4), y = estimate,
                   hjust = "left"), nudge_x = 0.005) +
     facet_grid(term ~ wiki, scales = "free_y") +
-    scale_x_continuous(limits = c(0.99, 1.05)) +
+    scale_x_continuous(limits = c(0.99, 1.02)) +
     labs(
       x = NULL, y = "Estimate",
       title = "How likely test group users were to engage with search results",
@@ -1087,16 +916,9 @@ searches %>%
   cbind(
     as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  geom_text(aes(label = sprintf("%.1f", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
+  pointrange_chart(y_lab = "Proportion of searches", title = "Position of the first clicked same-wiki result by test group",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ `first clicked result's position`, ncol = 5, scales = "free_y") +
-  labs(x = NULL, y = "Proportion of searches",
-       title = "Position of the first clicked same-wiki result by test group",
-       subtitle = "With 95% credible intervals") +
   theme_facet(clean_xaxis = TRUE)
 ```
 
@@ -1115,18 +937,9 @@ searches %>%
   cbind(
     as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  geom_text(aes(label = sprintf("%.1f", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
+  pointrange_chart(y_lab = "Proportion of searches", title = "Position of the first clicked same-wiki result by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki + `first clicked result's position`, ncol = 5, scale = "free_y") +
-  labs(
-    x = NULL, y = "Proportion of searches",
-    title = "Position of the first clicked same-wiki result by test group and wiki",
-    subtitle = "With 95% credible intervals"
-  ) +
   theme_facet(clean_xaxis = TRUE)
 ```
 
@@ -1154,18 +967,9 @@ searches %>%
     as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
   ) %>%
   mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  geom_text(aes(label = sprintf("%.1f", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
+  pointrange_chart(y_lab = "Proportion of searches", title = "Maximum clicked position for same-wiki results, by test group",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ `max clicked position (same-wiki)`, ncol = 6, scale = "free_y") +
-  labs(
-    x = NULL, y = "Proportion of searches",
-    title = "Maximum clicked position for same-wiki results, by test group",
-    subtitle = "With 95% credible intervals"
-  ) +
   theme_facet(clean_xaxis = TRUE)
 ```
 
@@ -1191,18 +995,9 @@ searches %>%
     as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
   ) %>%
   mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  geom_text(aes(label = sprintf("%.1f", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
+  pointrange_chart(y_lab = "Proportion of searches", title = "Maximum clicked position for same-wiki results, by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki + `max clicked position (same-wiki)`, ncol = 6, scale = "free_y") +
-  labs(
-    x = NULL, y = "Proportion of searches",
-    title = "Maximum clicked position for same-wiki results, by test group and wiki",
-    subtitle = "With 95% credible intervals"
-  ) +
   theme_facet(clean_xaxis = TRUE)
 ```
 
@@ -1284,18 +1079,8 @@ serp_offset %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Proportion of searches",
-    title = "Proportion of searches with clicks to see other pages of the search results, by test group",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Proportion of searches", title = "Proportion of searches with clicks to see other pages of the search results, by test group",
+                   subtitle = "With 95% credible intervals.") + 
   theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
@@ -1310,18 +1095,9 @@ serp_offset %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Proportion of searches",
-    title = "Proportion of searches with clicks to see other pages of the search results, by test group and wiki",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Proportion of searches", 
+                   title = "Proportion of searches with clicks to see other pages of the search results, by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet(clean_xaxis = TRUE)
 ```
@@ -1385,16 +1161,9 @@ visitedPages %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(x = NULL, y = "Proportion of visits",
-       title = "Proportion of visits with scroll by test group",
-       subtitle = "With 95% credible intervals.") +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Proportion of visits", 
+                   title = "Proportion of visits with scroll by test group",
+                   subtitle = "With 95% credible intervals.") + 
   theme_facet(border = FALSE, clean_xaxis = TRUE)
 ```
 
@@ -1406,18 +1175,9 @@ visitedPages %>%
   cbind(
     as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
   ) %>%
-  ggplot(aes(x = 1, y = mean, color = group)) +
-  geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_color_brewer("Group", palette = "Set1") +
-  labs(
-    x = NULL, y = "Proportion of visits",
-    title = "Proportion of visits with scroll by test group and wiki",
-    subtitle = "With 95% credible intervals."
-  ) +
-  geom_text(aes(label = sprintf("%.2f%%", 100 * mean),
-                y = upper + 0.0025, vjust = "bottom"),
-            position = position_dodge(width = 1)) +
+  pointrange_chart(y_lab = "Proportion of visits", 
+                   title = "Proportion of visits with scroll by test group and wiki",
+                   subtitle = "With 95% credible intervals.") + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet(clean_xaxis = TRUE)
 ```
