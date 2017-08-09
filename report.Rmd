@@ -496,7 +496,7 @@ serp_offset %>%
 
 `r if ("user_agent" %in% names(events)) { "#### Browser & OS" }`
 
-The goal here is to see whether the proportions of operating system (OS) and browser usage are similar between the groups. If one group has very different OS/browser share breakdown, there might be something wrong with the implementation that caused or is causing the sampling to bias in favor of some OSes/browsers. **Note** that for brevity, we show only the top 10 OSes/browsers, and that we don't *actually* expect the numbers to be different so this is included purely as a diagnostic.
+`r if ("user_agent" %in% names(events)) { " The goal here is to see whether the proportions of operating system (OS) and browser usage are similar between the groups. If one group has very different OS/browser share breakdown, there might be something wrong with the implementation that caused or is causing the sampling to bias in favor of some OSes/browsers. **Note** that for brevity, we show only the top 10 OSes/browsers, and that we don't *actually* expect the numbers to be different so this is included purely as a diagnostic. " }`
 
 ```{r user_agents, echo=FALSE, eval=("user_agent" %in% names(events))}
 user_agents <- dplyr::distinct(events, wiki, session_id, group, user_agent)
@@ -542,7 +542,7 @@ user_agents %>%
   group_by(wiki, group, browser) %>%
   summarize_uas
 ```
-```{r ua_cleanup, echo=FALSE}
+```{r ua_cleanup, echo=FALSE, eval=("user_agent" %in% names(events))}
 rm(user_agents, top_10_oses, top_10_browsers)
 ```
 
