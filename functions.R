@@ -4,7 +4,9 @@ query_score <- function(positions, F) { # 0-based positions
     # no clicks were made
     return(0)
   } else {
-    positions <- positions[!is.na(positions)] # when operating on 'events' dataset, searchResultPage events won't have positions
+    positions <- unique(positions[!is.na(positions)])
+    # when operating on 'events' dataset, searchResultPage events won't have positions
+    # sometimes users may click on the same position multiple times, see https://phabricator.wikimedia.org/T172960
     return(sum(F ^ positions))
   }
 }
@@ -99,7 +101,7 @@ pointrange_chart <- function(data = NULL, y_lab = NULL, title = NULL, caption = 
     ggplot2::scale_color_brewer("Group", palette = "Set1") +
     ggplot2::labs(x = NULL, y = y_lab, title = title, subtitle = subtitle) +
     ggplot2::geom_text(
-      aes(label = sprintf("%.2f%%", 100 * mean), y = upper + 0.0025, vjust = "bottom"), 
+      aes(label = sprintf("%.2f%%", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
       position = position_dodge(width = 1)
       )
 }

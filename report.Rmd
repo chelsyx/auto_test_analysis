@@ -58,8 +58,12 @@ $( function() {
 ```
 ```{css, echo=FALSE}
 /* Differentiate sub-tabs from tabs by using its complement */
-div.tab-content a[role=tab] {
+ul.nav-tabs a[role=tab] {
   color: #BC1838;
+}
+/* When sub-tab is active, set the color to #2c3e50*/
+ul.nav-tabs li.active a[role=tab] {
+  color: #2c3e50;
 }
 ```
 ```{r setup, echo=FALSE, error=TRUE, message=params$debug, warning=params$debug}
@@ -101,7 +105,7 @@ is_stat_machine <- grepl("^stat1", Sys.info()["nodename"])
 if (!is_stat_machine & is.null(params$data)) {
   message("Create an auto-closing SSH tunnel in the background...")
   # See https://gist.github.com/scy/6781836 for more info.
-  system("ssh -f -o ExitOnForwardFailure=yes stat1003.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
+  system("ssh -f -o ExitOnForwardFailure=yes stat1006.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
   library(RMySQL)
   con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "log", port = 3307)
 }
@@ -496,21 +500,12 @@ serp_offset %>%
 
 `r if ("user_agent" %in% names(events)) { "#### Browser & OS" }`
 
-`r if ("user_agent" %in% names(events)) { " The goal here is to see whether the proportions of operating system (OS) and browser usage are similar between the groups. If one group has very different OS/browser share breakdown, there might be something wrong with the implementation that caused or is causing the sampling to bias in favor of some OSes/browsers. **Note** that for brevity, we show only the top 10 OSes/browsers, and that we don't *actually* expect the numbers to be different so this is included purely as a diagnostic. " }`
+`r if ("user_agent" %in% names(events)) { " The goal here is to see whether the proportions of operating system (OS) and browser usage are similar between the groups. To aid decision making, [Bayes factor](https://en.wikipedia.org/wiki/Bayes_factor) is computed for each row. If one group has very different OS/browser share breakdown (Bayes factor >= 2), there might be something wrong with the implementation that caused or is causing the sampling to bias in favor of some OSes/browsers. **Note** that for brevity, we show only the top 10 OSes/browsers, and that we don't *actually* expect the numbers to be different so this is included purely as a diagnostic. " }`
 
 ```{r user_agents, echo=FALSE, eval=("user_agent" %in% names(events))}
 user_agents <- dplyr::distinct(events, wiki, session_id, group, user_agent)
-null2na <- function(x) {
-  return(lapply(x, function(y) {
-    if (is.null(y)) {
-      return(as.character(NA))
-    } else {
-      return(y)
-    }
-  }))
-}
 user_agents <- user_agents %>%
-  cbind(., purrr::map_df(.$user_agent, ~ null2na(jsonlite::fromJSON(.x, simplifyVector = FALSE)))) %>%
+  cbind(., purrr::map_df(.$user_agent, ~ wmf::null2na(jsonlite::fromJSON(.x, simplifyVector = FALSE)))) %>%
   mutate(
     browser = paste(browser_family, browser_major),
     os = case_when(
@@ -524,8 +519,18 @@ summarize_uas <- function(data) {
     tally %>%
     mutate(prop = paste0(scales::percent_format()(n/sum(n)), " (", n, ")")) %>%
     select(-n) %>%
-    tidyr::spread(group, prop) %>%
-    knitr::kable()
+    tidyr::spread(group, prop)
+}
+get_bayes_factor <- function(data) {
+  BF <- data %>%
+    tally %>%
+    tidyr::spread(group, n) %>%
+    ungroup %>%
+    select(params$test_group_names) %>%
+    as.matrix() %>%
+    # see http://bayesfactorpcl.r-forge.r-project.org/#ctables for more info
+    BayesFactor::contingencyTableBF(sampleType = "indepMulti", fixedMargin = "cols")
+  return(round(BayesFactor::extractBF(BF)$bf, 4))
 }
 ```
 ```{r os_table, echo=FALSE, results='asis', eval=("user_agent" %in% names(events))}
@@ -533,22 +538,48 @@ top_10_oses <- names(head(sort(table(user_agents$os), decreasing = TRUE), 10))
 user_agents %>%
   mutate(os = if_else(os %in% top_10_oses, os, "Other OSes")) %>%
   group_by(wiki, group, os) %>%
-  summarize_uas
+  summarize_uas %>%
+  mutate(`Bayes Factor` = purrr::map_dbl(.x = split(.[, c("wiki", "os")], seq(nrow(.))), .f = function(.x) {
+    user_agents %>%
+      keep_where(wiki == .x$wiki) %>%
+      mutate(os = dplyr::case_when(
+        os == .x$os ~ os,
+        !(os %in% top_10_oses) & .x$os == "Other OSes" ~ "Other OSes",
+        TRUE ~ "other")) %>%
+      group_by(wiki, group, os) %>%
+      get_bayes_factor
+  })) %>%
+  formattable::formattable(list(
+    `Bayes Factor` = formattable::formatter("span", style = x ~ ifelse(x >= 2, formattable::style(color = "red", font.weight = "bold"), NA))
+  ))
 ```
 ```{r browser_table, echo=FALSE, results='asis', eval=("user_agent" %in% names(events))}
 top_10_browsers <- names(head(sort(table(user_agents$browser), decreasing = TRUE), 10))
 user_agents %>%
   mutate(browser = if_else(browser %in% top_10_browsers, browser, "Other browsers")) %>%
   group_by(wiki, group, browser) %>%
-  summarize_uas
+  summarize_uas %>%
+  mutate(`Bayes Factor` = purrr::map_dbl(.x = split(.[, c("wiki", "browser")], seq(nrow(.))), .f = function(.x) {
+    user_agents %>%
+      keep_where(wiki == .x$wiki) %>%
+      mutate(browser = dplyr::case_when(
+        browser == .x$browser ~ browser,
+        !(browser %in% top_10_browsers) & .x$browser == "Other browsers" ~ "Other browsers",
+        TRUE ~ "other")) %>%
+      group_by(wiki, group, browser) %>%
+      get_bayes_factor
+  })) %>%
+  formattable::formattable(list(
+    `Bayes Factor` = formattable::formatter("span", style = x ~ ifelse(x >= 2, formattable::style(color = "red", font.weight = "bold"), NA))
+  ))
 ```
 ```{r ua_cleanup, echo=FALSE, eval=("user_agent" %in% names(events))}
 rm(user_agents, top_10_oses, top_10_browsers)
 ```
 
-### Sister Search {.tabset}
+`r if (any(exists("serp_iw"), exists("ssclick_des"), "ssclick" %in% events$event, "iwclick" %in% events$event)) { "### Sister Search {.tabset}" }`
 
-Select one of these sub-tabs:
+`r if (any(exists("serp_iw"), exists("ssclick_des"), "ssclick" %in% events$event, "iwclick" %in% events$event)) { "Select one of these sub-tabs:" }`
 
 `r if (exists("serp_iw")) { "#### Sidebar results by source and position" }`
 
@@ -675,9 +706,9 @@ events %>%
   theme_facet()
 ```
 
-### Explore Similar {.tabset}
+`r if (any(exists("esclick_result"), exists("hover_over"))) { "### Explore Similar {.tabset}" }`
 
-Select one of these sub-tabs:
+`r if (any(exists("esclick_result"), exists("hover_over"))) { "Select one of these sub-tabs:" }`
 
 `r if (exists("esclick_result")) { "#### Clicks by section and position" }`
 
