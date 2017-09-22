@@ -498,21 +498,46 @@ Select one of these sub-tabs:
 
 #### Events
 
-*Action* identifies the context in which the event was created. Every time a new search is performed a **searchEngineResultPage** event is created. When the user clicks a link in the results a **visitPage** event is created. When the user has [dwelled](https://en.wikipedia.org/wiki/Dwell_time_(information_retrieval)) for N seconds a **checkin** event occurs. If the user clicks an interwiki result provided by [TextCat](https://www.mediawiki.org/wiki/TextCat) language detection, there is a **iwclick** event. If the user clicks on a [sister search](https://www.mediawiki.org/wiki/Cross-wiki_Search_Result_Improvements) result from the sidebar, that's an **ssclick.** If the user interacts with a result to explore similar (pages, categories, translations), there are **hover-on**, **hover-off**, and **esclick** events.
+*Event type* identifies the context in which the event was created. Every time a new search is performed a **searchResultPage** event is created. When the user **clicks** a link in the results a **visitPage** event is created. When the user has [dwelled](https://en.wikipedia.org/wiki/Dwell_time_(information_retrieval)) for N seconds a **checkin** event occurs. If the user clicks an interwiki result provided by [TextCat](https://www.mediawiki.org/wiki/TextCat) language detection, there is a **iwclick** event. If the user clicks on a [sister search](https://www.mediawiki.org/wiki/Cross-wiki_Search_Result_Improvements) result from the sidebar, that's an **ssclick.** If the user interacts with a result to explore similar (pages, categories, translations), there are **hover-on**, **hover-off**, and **esclick** events.
 
 ```{r event_count_all, echo=FALSE}
 events %>%
+  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
+  mutate(event = factor(event, levels =c("searchResultPage", "click", "ssclick", "iwclick", "hover-on", "esclick", "hover-off"))) %>% # Order the bars
   group_by(group, event) %>%
   tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Action", y_lab = "Number of events", title = "Number of events by test group") +
+  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on search result pages by test group") +
   theme_min()
 ```
 
 ```{r event_count_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
 events %>%
+  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
+  mutate(event = factor(event, levels =c("searchResultPage", "click", "ssclick", "iwclick", "hover-on", "esclick", "hover-off"))) %>% # Order the bars
   group_by(group, wiki, event) %>%
   tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Action", y_lab = "Number of events", title = "Number of events by test group and wiki") +
+  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on search result pages by test group and wiki") +
+  theme_facet() +
+  facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
+```
+
+```{r event_after_click_all, echo=FALSE}
+events %>%
+  keep_where(event %in% c("visitPage", "checkin")) %>%
+  mutate(event = factor(event, levels =c("visitPage", "checkin"))) %>% # Order the bars
+  group_by(group, event) %>%
+  tally %>%
+  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on articles after clickthrough, by test group") +
+  theme_min()
+```
+
+```{r event_after_click_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
+events %>%
+  keep_where(event %in% c("visitPage", "checkin")) %>%
+  mutate(event = factor(event, levels =c("visitPage", "checkin"))) %>% # Order the bars
+  group_by(group, wiki, event) %>%
+  tally %>%
+  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on articles after clickthrough, by test group and wiki") +
   theme_facet() +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
@@ -741,12 +766,12 @@ serp_iw %>%
 
 ```{r serp_iw_na, eval=exists("serp_iw"), echo=FALSE}
 serp_iw %>%
-  keep_where(is.na(source), is.na(position)) %>%
+  keep_where(!is.na(source)|!is.na(position)) %>%
   dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
   group_by(group, wiki) %>%
   summarize(counts = length(unique(event_id))) %>%
   bar_chart(x = "wiki", y = "counts", x_lab = "Wiki", y_lab = "Number of SERPs", 
-            title = "Number of SERPs without sister-search sidebar results, by test group and wiki") +
+            title = "Number of SERPs with sidebar results, by test group and wiki") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
