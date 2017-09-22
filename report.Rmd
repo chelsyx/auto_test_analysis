@@ -58,7 +58,7 @@ $( function() {
 ```
 ```{css, echo=FALSE}
 /* Differentiate sub-tabs from tabs by using its complement */
-ul.nav-tabs a[role=tab] {
+div.tab-content a[role=tab] {
   color: #BC1838;
 }
 /* When sub-tab is active, set the color to #2c3e50*/
@@ -445,7 +445,7 @@ if ("esclick" %in% events$event & !is.null(events$event_extraParams)) {
   esclick_result <- events %>%
     keep_where(event == "esclick") %>%
     cbind(., do.call(dplyr::bind_rows, lapply(.$event_extraParams, parse_extraParams, action = "esclick"))) %>%
-    select(group, wiki, session_id, serp_id, page_id, event_id, hoverId, section, result)
+    select(group, wiki, session_id, serp_id, page_id, event_id, hoverId, section, result, position)
   
   searches <- esclick_result %>%
     group_by(group, wiki, session_id, serp_id) %>%
@@ -829,17 +829,17 @@ events %>%
 
 `r if (any(exists("esclick_result"), exists("hover_over"))) { "Select one of these sub-tabs:" }`
 
-`r if (exists("esclick_result")) { "#### Clicks by section and position" }`
+`r if (exists("esclick_result")) { "#### Clicks by section and link's position on search result page" }`
 
 ```{r esclick_summary, eval=exists("esclick_result"), echo=FALSE}
 esclick_result %>%
   mutate(
     section = ifelse(is.na(section), "NA", section),
-    result = ifelse(is.na(result), "NA", paste(safe_ordinals(result + 1), "result"))
+    position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
   ) %>%
-  group_by(section, result) %>%
+  group_by(section, position) %>%
   tally %>%
-  xtabs(n ~ section + result, data = .) %>%
+  xtabs(n ~ section + position, data = .) %>%
   addmargins %>%
   knitr::kable()
 ```
@@ -848,13 +848,13 @@ esclick_result %>%
 esclick_result %>%
   mutate(
     section = ifelse(is.na(section), "NA", section),
-    result = ifelse(is.na(result), "NA", paste(safe_ordinals(result + 1), "result"))
+    position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
   ) %>%
-  group_by(group, section, result) %>%
+  group_by(group, section, position) %>%
   tally %>%
   bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
             title = "Number of explore similar clicks by section, clicked position and test group") + 
-  facet_wrap(~ result, scale = "free_y") +
+  facet_wrap(~ position, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
@@ -862,13 +862,13 @@ esclick_result %>%
 esclick_result %>%
   mutate(
     section = ifelse(is.na(section), "NA", section),
-    result = ifelse(is.na(result), "NA", paste(safe_ordinals(result + 1), "result"))
+    position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
   ) %>%
-  group_by(group, wiki, section, result) %>%
+  group_by(group, wiki, section, position) %>%
   tally %>%
   bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
             title = "Number of explore similar clicks by section, clicked position, test group and wiki") + 
-  facet_grid(wiki ~ result, scale = "free_y") +
+  facet_grid(wiki ~ position, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
 
