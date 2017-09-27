@@ -95,13 +95,10 @@ bar_chart <- function(data = NULL, x, y, geom_text_size = 3, x_lab = NULL, y_lab
 
 # Point range chart
 pointrange_chart <- function(data = NULL, y_lab = NULL, title = NULL, caption = NULL, subtitle = NULL, ...) {
-  ggplot2::ggplot(data = data, aes(x = 1, y = mean, color = group)) +
-    ggplot2::geom_pointrange(aes(ymin = lower, ymax = upper), position = position_dodge(width = 1)) +
+  ggplot2::ggplot(data = data, aes(x = group, color = group, y = mean, ymin = lower, ymax = upper)) +
+    geom_linerange() +
+    geom_label(aes(label = sprintf("%.2f%%", 100 * mean)), show.legend = FALSE) +
     ggplot2::scale_y_continuous(labels = scales::percent_format()) +
-    ggplot2::scale_color_brewer("Group", palette = "Set1") +
-    ggplot2::labs(x = NULL, y = y_lab, title = title, subtitle = subtitle) +
-    ggplot2::geom_text(
-      aes(label = sprintf("%.2f%%", 100 * mean), y = upper + 0.0025, vjust = "bottom"),
-      position = position_dodge(width = 1)
-      )
+    ggplot2::scale_color_brewer(palette = "Set1") +
+    ggplot2::labs(x = NULL, color = "Group", y = y_lab, title = title, subtitle = subtitle)
 }
