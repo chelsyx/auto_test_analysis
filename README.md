@@ -20,3 +20,5 @@ Rscript run.R --yaml_file=/path/to/your/file.yaml
 ```
 
 For each test (assuming report title remains the same), a directory named `/data/report_title/` would be created to store the data fetched from MySQL database. The HTML reports could be found in the `/reports/` directory. With `--publish`, the report can be viewed at https://analytics.wikimedia.org/datasets/discovery/reports/your_report_title.html. If you want to publish the report from local machine, you have to provide your LDAP username by `--username=your_LDAP_username` (default to NULL).
+
+Please note that this project is licensed under [MIT License](LICENSE.md) and released with a [Contributor Code of Conduct](CONDUCT.md). By participating in this project you agree to abide by its terms. [Wikimedia technical spaces code of conduct](https://www.mediawiki.org/wiki/Special:MyLanguage/Code_of_Conduct) also applies.

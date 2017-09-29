@@ -900,7 +900,7 @@ hover_rate <- searches %>%
   summarize(hover = sum(n_hover > 0), n_search = n()) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$hover, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$hover, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   )
 
 searches %>%
@@ -909,7 +909,7 @@ searches %>%
   summarize(hover = sum(n_hover > 0), n_search = n()) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$hover, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$hover, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   ) %>%
   ggplot(aes(x = date, color = group, y = mean, ymin = lower, ymax = upper)) +
   geom_hline(data = hover_rate, aes(yintercept = mean, color = group), linetype = "dashed") +
@@ -936,7 +936,7 @@ zrr_function <- function(by_wiki = FALSE, ...) {
     summarize(zero = sum(!`got same-wiki results`), n_search = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(
       y_lab = "Zero Results Rate", 
@@ -959,7 +959,7 @@ zrr <- searches %>%
   summarize(n_search = n(), zero = sum(!`got same-wiki results`)) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   )
 
 searches %>%
@@ -967,7 +967,7 @@ searches %>%
   summarize(n_search = n(), zero = sum(!`got same-wiki results`)) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   ) %>%
   ggplot(aes(x = date, color = group, y = mean, ymin = lower, ymax = upper)) +
   geom_hline(data = zrr, aes(yintercept = mean, color = group), linetype = "dashed") +
@@ -993,7 +993,7 @@ samewiki_ctr_function <- function(by_wiki = FALSE, ...) {
     summarize(clickthroughs = sum(`same-wiki clickthrough`), n_search = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95, tol = 1e-9))
     )
 }
 samewiki_ctr_all <- samewiki_ctr_function() # save object samewiki_ctr_all for odds ratio plot
@@ -1086,7 +1086,7 @@ ctr <- searches %>%
   summarize(n_search = n(), clickthroughs = sum(`same-wiki clickthrough`)) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   )
 
 searches %>%
@@ -1095,7 +1095,7 @@ searches %>%
   summarize(n_search = n(), clickthroughs = sum(`same-wiki clickthrough`)) %>%
   ungroup %>%
   cbind(
-    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
+    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95, tol = 1e-9))
   ) %>%
   ggplot(aes(x = date, color = group, y = mean, ymin = lower, ymax = upper)) +
   geom_hline(data = ctr, aes(yintercept = mean, color = group), linetype = "dashed") +
@@ -1127,7 +1127,7 @@ first_clicked_function <- function(by_wiki = FALSE, ...) {
     mutate(total = sum(n)) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(
       y_lab = "Proportion of searches", 
@@ -1168,7 +1168,7 @@ max_clicked_function <- function(by_wiki = FALSE, ...) {
     mutate(total = sum(counts)) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95, tol = 1e-9))
     ) %>%
     mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
     pointrange_chart(
@@ -1266,7 +1266,7 @@ search_offset_function <- function(by_wiki = FALSE, ...) {
     summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(
       y_lab = "Proportion of searches", 
@@ -1321,6 +1321,7 @@ ggsurv <- survminer::ggsurvplot(
   ylab = "Proportion of visits longer than T (P%)",
   surv.scale = "percent",
   palette = "Set1",
+  legend = "bottom",
   legend.title = "Group",
   ggtheme = theme_facet()
 )
@@ -1342,7 +1343,7 @@ scroll_function <- function(by_wiki = FALSE, ...) {
     summarize(scrolls = sum(scroll), n_visit = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(y_lab = "Proportion of visits", 
                      title = paste("Proportion of visits with scroll by test group", switch(by_wiki, "and wiki", NULL)),
@@ -1367,7 +1368,7 @@ search_abandon_rate_function <- function(by_wiki = FALSE, ...) {
     summarize(abandon = n() - sum(engaged), n_search = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$abandon, n = .$n_search, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$abandon, n = .$n_search, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(
       y_lab = "Search Abandon Rate", 
@@ -1393,7 +1394,7 @@ scroll_serp_function <- function(by_wiki = FALSE, ...) {
     summarize(scrolls = sum(n_scroll_serp > 0), n_serp = n()) %>%
     ungroup %>%
     cbind(
-      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_serp, conf.level = 0.95))
+      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_serp, conf.level = 0.95, tol = 1e-9))
     ) %>%
     pointrange_chart(y_lab = "Proportion of SERPs", 
                      title = paste("Proportion of search results pages with scroll by test group", switch(by_wiki, "and wiki", NULL)),
@@ -1448,6 +1449,7 @@ ggsurv <- survminer::ggsurvplot(
   ylab = "Proportion of SERPs longer than T (P%)",
   surv.scale = "percent",
   palette = "Set1",
+  legend = "bottom",
   legend.title = "Group",
   ggtheme = theme_facet()
 )
@@ -1481,7 +1483,7 @@ return_rate_function <- function(by_wiki = FALSE, ...) {
     group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
     summarize(return_to_same_search = sum(comeback), n_search = length(unique(serp_id))) %>%
     group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
-    dplyr::do(binom::binom.bayes(.$return_to_same_search, .$n_search, conf.level = 0.95))
+    dplyr::do(binom::binom.bayes(.$return_to_same_search, .$n_search, conf.level = 0.95, tol = 1e-9))
 
   returnRate_to_other_search <- events %>%
     keep_where(!(event %in% c("visitPage", "checkin"))) %>%
@@ -1494,7 +1496,7 @@ return_rate_function <- function(by_wiki = FALSE, ...) {
     group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
     summarize(return_to_make_another_search = sum(another_search), n_session = length(unique(session_id))) %>%
     group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
-    dplyr::do(binom::binom.bayes(.$return_to_make_another_search, .$n_session, conf.level = 0.95))
+    dplyr::do(binom::binom.bayes(.$return_to_make_another_search, .$n_session, conf.level = 0.95, tol = 1e-9))
   
   dplyr::bind_rows("Return to the same search page" = returnRate_to_same_search, 
                    "Return to make different search" = returnRate_to_other_search, .id = "type") %>%
@@ -1504,16 +1506,12 @@ return_rate_function <- function(by_wiki = FALSE, ...) {
 return_rate_function() + 
   facet_wrap(~ type, scales = "free_y") + 
   theme_facet(border = FALSE)
-
-rm(returnRate_to_same_search, returnRate_to_other_search)
 ```
 
 ```{r return_rate_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
 return_rate_function(by_wiki = TRUE) + 
   facet_grid(wiki ~ type, scale = "free_y") +
   theme_facet()
-
-rm(returnRate_to_same_search, returnRate_to_other_search)
 ```
 
 ### Load time of search results pages
