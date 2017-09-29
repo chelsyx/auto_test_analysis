@@ -439,12 +439,11 @@ if ("ssclick" %in% events$event & !is.null(events$event_extraParams)) {
 ```
 
 ```{r es_extra_param, echo=FALSE}
-# TODO: purrrify
 message("Processing explore-similar clicks...")
 if ("esclick" %in% events$event & !is.null(events$event_extraParams)) {
   esclick_result <- events %>%
     keep_where(event == "esclick") %>%
-    cbind(., do.call(dplyr::bind_rows, lapply(.$event_extraParams, parse_extraParams, action = "esclick"))) %>%
+    cbind(purrr::map_df(.$event_extraParams, parse_extraParams, action = "esclick")) %>%
     select(group, wiki, session_id, serp_id, page_id, event_id, hoverId, section, result, position)
   
   searches <- esclick_result %>%
@@ -458,7 +457,7 @@ message("Processing explore-similar hover events...")
 if (all(c("hover-on", "hover-off") %in% events$event) & !is.null(events$event_extraParams)) {
   hover_over <- events %>%
     keep_where(event %in% c("hover-on", "hover-off")) %>%
-    cbind(., do.call(dplyr::bind_rows, lapply(.$event_extraParams, parse_extraParams, action = c("hover-on", "hover-off")))) %>%
+    cbind(purrr::map_df(.$event_extraParams, parse_extraParams, action = c("hover-on", "hover-off"))) %>%
     select(timestamp, group, wiki, session_id, serp_id, page_id, event_id, event, hoverId, section, results)
   
   searches <- hover_over %>%
@@ -501,43 +500,37 @@ Select one of these sub-tabs:
 *Event type* identifies the context in which the event was created. Every time a new search is performed a **searchResultPage** event is created. When the user **clicks** a link in the results a **visitPage** event is created. When the user has [dwelled](https://en.wikipedia.org/wiki/Dwell_time_(information_retrieval)) for N seconds a **checkin** event occurs. If the user clicks an interwiki result provided by [TextCat](https://www.mediawiki.org/wiki/TextCat) language detection, there is a **iwclick** event. If the user clicks on a [sister search](https://www.mediawiki.org/wiki/Cross-wiki_Search_Result_Improvements) result from the sidebar, that's an **ssclick.** If the user interacts with a result to explore similar (pages, categories, translations), there are **hover-on**, **hover-off**, and **esclick** events.
 
 ```{r event_count_all, echo=FALSE}
-events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  mutate(event = factor(event, levels =c("searchResultPage", "click", "ssclick", "iwclick", "hover-on", "esclick", "hover-off"))) %>% # Order the bars
-  group_by(group, event) %>%
-  tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on search result pages by test group") +
-  theme_min()
+event_count_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(!(event %in% c("visitPage", "checkin"))) %>%
+    mutate(event = factor(event, levels =c("searchResultPage", "click", "ssclick", "iwclick", "hover-on", "esclick", "hover-off"))) %>% # Order the bars
+    group_by(!!! rlang::syms(c("group", "event", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = paste("Number of events on search result pages by test group", switch(by_wiki, "and wiki", NULL)))
+}
+event_count_function() + theme_min()
 ```
 
 ```{r event_count_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  mutate(event = factor(event, levels =c("searchResultPage", "click", "ssclick", "iwclick", "hover-on", "esclick", "hover-off"))) %>% # Order the bars
-  group_by(group, wiki, event) %>%
-  tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on search result pages by test group and wiki") +
+event_count_function(by_wiki = TRUE) + 
   theme_facet() +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 ```{r event_after_click_all, echo=FALSE}
-events %>%
-  keep_where(event %in% c("visitPage", "checkin")) %>%
-  mutate(event = factor(event, levels =c("visitPage", "checkin"))) %>% # Order the bars
-  group_by(group, event) %>%
-  tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on articles after clickthrough, by test group") +
-  theme_min()
+event_after_click_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(event %in% c("visitPage", "checkin")) %>%
+    mutate(event = factor(event, levels =c("visitPage", "checkin"))) %>% # Order the bars
+    group_by(!!! rlang::syms(c("group", "event", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = paste("Number of events on articles after clickthrough, by test group", switch(by_wiki, "and wiki", NULL)))
+}
+event_after_click_function() + theme_min()
 ```
 
 ```{r event_after_click_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(event %in% c("visitPage", "checkin")) %>%
-  mutate(event = factor(event, levels =c("visitPage", "checkin"))) %>% # Order the bars
-  group_by(group, wiki, event) %>%
-  tally %>%
-  bar_chart(x = "event", y = "n", x_lab = "Event type", y_lab = "Number of events", title = "Number of events on articles after clickthrough, by test group and wiki") +
+event_after_click_function(by_wiki = TRUE) +
   theme_facet() +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
@@ -583,63 +576,50 @@ searches %>%
 #### Searches with _n_ same-wiki results returned
 
 ```{r n_results_summary_all, echo=FALSE}
-events %>%
-  keep_where(event == "searchResultPage") %>%
-  mutate(results = if_else(n_results >= 5, "5+ results", Pluralize(n_results, "result"))) %>%
-  group_by(group, results) %>%
-  summarize(searches = length(unique(serp_id[!is.na(serp_id)]))) %>%
-  bar_chart(x = "results", y = "searches", x_lab = "Number of same-wiki results returned", 
-            y_lab = "Number of searches", title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group"))) +
-  theme_min()
+n_results_summary_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(event == "searchResultPage") %>%
+    mutate(results = if_else(n_results >= 5, "5+ results", Pluralize(n_results, "result"))) %>%
+    group_by(!!! rlang::syms(c("group", "results", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(searches = length(unique(serp_id[!is.na(serp_id)]))) %>%
+    bar_chart(x = "results", y = "searches", x_lab = "Number of same-wiki results returned", 
+              y_lab = "Number of searches", title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group", switch(by_wiki, "and wiki", NULL))))
+}
+n_results_summary_function() + theme_min()
 ```
 
 ```{r n_results_summary_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(event == "searchResultPage") %>%
-  mutate(results = if_else(n_results >= 5, "5+ results", Pluralize(n_results, "result"))) %>%
-  group_by(group, wiki, results) %>%
-  summarize(searches = length(unique(serp_id[!is.na(serp_id)]))) %>%
-  bar_chart(x = "results", y = "searches", x_lab = "Number of same-wiki results returned", 
-            y_lab = "Number of searches", title = expression(paste("Number of searches with ", italic("n"), " same-wiki result returned, by test group and wiki"))) +
-  theme_facet() + ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
+n_results_summary_function(by_wiki = TRUE) +
+  theme_facet() +
+  ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 `r if (exists("serp_offset")) { "#### SERPs by offset" }`
 
 ```{r serp_offset_summary_all, eval=exists("serp_offset"), echo=FALSE}
-serp_offset %>%
-  keep_where(!is.na(offset)) %>%
-  mutate(offset = case_when(
-    offset == 0 ~ "No offset (page 1)",
-    offset >= 100 ~ "100+ results",
-    TRUE ~ Pluralize(offset, "result")
-  )) %>%
-  dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
-  group_by(group, offset) %>%
-  tally %>%
-  bar_chart(x = "offset", y = "n", x_lab = "Offset", y_lab = "Number of SERPs", 
-            title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group")),
-            caption = "This can be regarded as a proxy for users visiting additional pages of their search results.") +
-  scale_x_discrete(limits = c("No offset (page 1)", Pluralize(c(20, 40, 60, 80), "result"), "100+ results")) +
-  theme_min()
+serp_offset_summary_function <- function(by_wiki = FALSE, ...) {
+  serp_offset %>%
+    keep_where(!is.na(offset)) %>%
+    mutate(offset = case_when(
+      offset == 0 ~ "No offset (page 1)",
+      offset >= 100 ~ "100+ results",
+      TRUE ~ Pluralize(offset, "result")
+    )) %>%
+    dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
+    group_by(!!! rlang::syms(c("group", "offset", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "offset", y = "n", x_lab = "Offset", y_lab = "Number of SERPs", 
+              title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group", switch(by_wiki, "and wiki", NULL))),
+              caption = "This can be regarded as a proxy for users visiting additional pages of their search results.") +
+    scale_x_discrete(limits = c("No offset (page 1)", Pluralize(c(20, 40, 60, 80), "result"), "100+ results"))
+}
+serp_offset_summary_function() + theme_min()
 ```
 
 ```{r serp_offset_summary_wiki, eval=(exists("serp_offset") & n_wiki > 1), echo=FALSE, fig.height=5*n_wiki}
-serp_offset %>%
-  keep_where(!is.na(offset)) %>%
-  mutate(offset = case_when(
-    offset == 0 ~ "No offset (page 1)",
-    offset >= 100 ~ "100+ results",
-    TRUE ~ Pluralize(offset, "result")
-  )) %>%
-  dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
-  group_by(group, wiki, offset) %>%
-  tally %>%
-  bar_chart(x = "offset", y = "n", x_lab = "Offset", 
-            y_lab = "Number of SERPs", title = expression(paste("Number of SERPs with ", italic("n"), " offset results, by test group and wiki")),
-            caption = "This can be regarded as a proxy for users visiting additional pages of their search results.") +
-  scale_x_discrete(limits = c("No offset (page 1)", Pluralize(c(20, 40, 60, 80), "result"), "100+ results")) +
-  theme_facet() + ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
+serp_offset_summary_function(by_wiki = TRUE) +
+  theme_facet() +
+  ggplot2::facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y")
 ```
 
 `r if ("user_agent" %in% names(events)) { "#### Browser & OS" }`
@@ -739,27 +719,23 @@ serp_iw %>%
 ```
 
 ```{r serp_iw_breakdown_all, eval=exists("serp_iw"), echo=FALSE, fig.height=8}
-serp_iw %>%
-  keep_where(!is.na(source), !is.na(position)) %>%
-  dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
-  mutate(position = paste(safe_ordinals(position), "result")) %>%
-  group_by(group, source, position) %>%
-  summarize(counts = length(unique(event_id))) %>%
-  bar_chart(x = "source", y = "counts", x_lab = "Source", y_lab = "Number of SERPs", geom_text_size = 2, 
-            title = "Number of SERPs' sister-search sidebar results by source, position and test group") + 
+serp_iw_breakdown_function <- function(by_wiki = FALSE, ...) {
+  serp_iw %>%
+    keep_where(!is.na(source), !is.na(position)) %>%
+    dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
+    mutate(position = paste(safe_ordinals(position), "result")) %>%
+    group_by(!!! rlang::syms(c("group", "source", "position", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(counts = length(unique(event_id))) %>%
+    bar_chart(x = "source", y = "counts", x_lab = "Source", y_lab = "Number of SERPs", geom_text_size = 2, 
+              title = paste("Number of SERPs' sister-search sidebar results by source, position, test group", switch(by_wiki, "and wiki", NULL)))
+}
+serp_iw_breakdown_function() +
   facet_wrap(~ position, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r serp_iw_breakdown_wiki, eval=(exists("serp_iw") & n_wiki > 1), echo=FALSE, fig.width=11, fig.height=(6 * n_wiki)}
-serp_iw %>%
-  keep_where(!is.na(source), !is.na(position)) %>%
-  dplyr::left_join(events, by = c("session_id", "event_id", "serp_id")) %>%
-  mutate(position = paste(safe_ordinals(position), "result")) %>%
-  group_by(group, wiki, source, position) %>%
-  summarize(counts = length(unique(event_id))) %>%
-  bar_chart(x = "source", y = "counts", x_lab = "Source", y_lab = "Number of SERPs", geom_text_size = 2, 
-            title = "Number of SERPs' sister-search sidebar results by source, position, test group and wiki") + 
+serp_iw_breakdown_function(by_wiki = TRUE) + 
   facet_grid(wiki ~ position, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -778,22 +754,19 @@ serp_iw %>%
 `r if (exists("ssclick_des")) { "#### Clicks by project" }`
 
 ```{r ssclick_project_all, eval=exists("ssclick_des"), echo=FALSE}
-ssclick_des %>%
-  dplyr::left_join(events, by = c("session_id", "event_id")) %>%
-  group_by(group, project) %>%
-  tally %>%
-  bar_chart(x = "project", y = "n", x_lab = "Project", y_lab = "Number of Sister Search Clicks", 
-            title = "Number of sister search clicks by project and test group") +
-  theme_min()
+ssclick_project_function <- function(by_wiki = FALSE, ...) {
+  ssclick_des %>%
+    dplyr::left_join(events, by = c("session_id", "event_id")) %>%
+    group_by(!!! rlang::syms(c("group", "project", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "project", y = "n", x_lab = "Project", y_lab = "Number of Sister Search Clicks", 
+              title = paste("Number of sister search clicks by project, test group", switch(by_wiki, "and wiki", NULL)))
+}
+ssclick_project_function() + theme_min()
 ```
 
 ```{r ssclick_project_wiki, eval=(exists("ssclick_des") & n_wiki > 1), echo=FALSE, fig.height=(5*n_wiki)}
-ssclick_des %>%
-  dplyr::left_join(events, by = c("session_id", "event_id")) %>%
-  group_by(group, wiki, project) %>%
-  tally %>%
-  bar_chart(x = "project", y = "n", x_lab = "Project", y_lab = "Number of Sister Search Clicks", 
-            title = "Number of sister search clicks by project, test group and wiki") + 
+ssclick_project_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -801,24 +774,20 @@ ssclick_des %>%
 `r if ("ssclick" %in% events$event) { "#### Clicks by position" }`
 
 ```{r ssclick_position_all, eval=("ssclick" %in% events$event), echo=FALSE}
-events %>%
-  keep_where(event == "ssclick") %>%
-  group_by(group, event_position) %>%
-  tally %>%
-  mutate(position = paste(safe_ordinals(event_position), "result")) %>%
-  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of Sister Search Clicks", 
-            title = "Number of sister search clicks by clicked position and test group") + 
-  theme_min()
+ssclick_position_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(event == "ssclick") %>%
+    group_by(!!! rlang::syms(c("group", "event_position", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    mutate(position = paste(safe_ordinals(event_position), "result")) %>%
+    bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of Sister Search Clicks", 
+              title = paste("Number of sister search clicks by clicked position, test group", switch(by_wiki, "and wiki", NULL)))
+}
+ssclick_position_function() + theme_min()
 ```
 
 ```{r ssclick_position_wiki, eval=("ssclick" %in% events$event & n_wiki > 1), echo=FALSE, fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(event == "ssclick") %>%
-  group_by(group, wiki, event_position) %>%
-  tally %>%
-  mutate(position = paste(safe_ordinals(event_position), "result")) %>%
-  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of Sister Search Clicks", 
-            title = "Number of sister search clicks by clicked position, test group and wiki") + 
+ssclick_position_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -826,26 +795,21 @@ events %>%
 `r if ("iwclick" %in% events$event) { "#### Inter-wiki clicks by position" }`
 
 ```{r iwclick_position_all, eval=("iwclick" %in% events$event), echo=FALSE}
-events %>%
-  keep_where(event == "iwclick") %>%
-  mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
-  group_by(group, position) %>%
-  tally %>%
-  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of inter-wiki clicks", 
-            title = "Number of inter-wiki clicks by clicked position and test group", 
-            subtitle = "Inter-wiki results are provided by TextCat language detection") + 
-  theme_min()
+iwclick_position_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(event == "iwclick") %>%
+    mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
+    group_by(!!! rlang::syms(c("group", "position", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of inter-wiki clicks", 
+              title = paste("Number of inter-wiki clicks by clicked position, test group", switch(by_wiki, "and wiki", NULL)), 
+              subtitle = "Inter-wiki results are provided by TextCat language detection")
+}
+iwclick_position_function() + theme_min()
 ```
 
 ```{r iwclick_position_wiki, eval=("iwclick" %in% events$event & n_wiki > 1), echo=FALSE, fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(event == "iwclick") %>%
-  mutate(position = ifelse(event_position < 4, safe_ordinals(event_position + 1), "5th or higher")) %>%
-  group_by(group, wiki, position) %>%
-  tally %>%
-  bar_chart(x = "position", y = "n", x_lab = "Clicked Position", y_lab = "Number of inter-wiki clicks", 
-            title = "Number of inter-wiki clicks by clicked position, test group, and wiki", 
-            subtitle = "Inter-wiki results are provided by TextCat language detection") + 
+iwclick_position_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
@@ -870,29 +834,24 @@ esclick_result %>%
 ```
 
 ```{r esclick_breakdown_all, eval=exists("esclick_result"), echo=FALSE}
-esclick_result %>%
-  mutate(
-    section = ifelse(is.na(section), "NA", section),
-    position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
-  ) %>%
-  group_by(group, section, position) %>%
-  tally %>%
-  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
-            title = "Number of explore similar clicks by section, clicked position and test group") + 
+esclick_breakdown_function <- function(by_wiki = FALSE, ...) {
+  esclick_result %>%
+    mutate(
+      section = ifelse(is.na(section), "NA", section),
+      position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
+    ) %>%
+    group_by(!!! rlang::syms(c("group", "section", "position", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
+              title = paste("Number of explore similar clicks by section, clicked position, test group", switch(by_wiki, "and wiki", NULL)))
+}
+esclick_breakdown_function() + 
   facet_wrap(~ position, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r esclick_breakdown_wiki, eval=(exists("esclick_result") & n_wiki > 1), echo=FALSE, fig.height=6*n_wiki}
-esclick_result %>%
-  mutate(
-    section = ifelse(is.na(section), "NA", section),
-    position = ifelse(is.na(position), "NA", paste(safe_ordinals(position + 1), "result"))
-  ) %>%
-  group_by(group, wiki, section, position) %>%
-  tally %>%
-  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Explore Similar Clicks", 
-            title = "Number of explore similar clicks by section, clicked position, test group and wiki") + 
+esclick_breakdown_function(by_wiki = TRUE) + 
   facet_grid(wiki ~ position, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -911,31 +870,25 @@ hover_over %>%
 ```
 
 ```{r hover_breakdown_all, eval=exists("hover_over"), echo=FALSE, fig.height=8}
-hover_over %>%
-  keep_where(event == "hover-on") %>%
-  mutate(
-    section = ifelse(is.na(section), "NA", section),
-    results = ifelse(is.na(results), "NA", ifelse(results >= 5, "5+ results", Pluralize(results, "result")))
-  ) %>%
-  group_by(group, section, results) %>%
-  tally %>%
-  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Hover-Over", geom_text_size = 2.5, 
-            title = "Number of hover-over events by section, number of results and test group") + 
+hover_breakdown_function <- function(by_wiki = FALSE, ...) {
+  hover_over %>%
+    keep_where(event == "hover-on") %>%
+    mutate(
+      section = ifelse(is.na(section), "NA", section),
+      results = ifelse(is.na(results), "NA", ifelse(results >= 5, "5+ results", Pluralize(results, "result")))
+    ) %>%
+    group_by(!!! rlang::syms(c("group", "section", "results", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Hover-Over", geom_text_size = 2.5, 
+              title = paste("Number of hover-over events by section, number of results, test group", switch(by_wiki, "and wiki", NULL)))
+}
+hover_breakdown_function() + 
   facet_wrap(~ results, scale = "free_y") +
   theme_min(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r hover_breakdown_wiki, eval=(exists("hover_over") & n_wiki > 1), echo=FALSE, fig.width=11, fig.height=(6 * n_wiki)}
-hover_over %>%
-  keep_where(event == "hover-on") %>%
-  mutate(
-    section = ifelse(is.na(section), "NA", section),
-    results = ifelse(is.na(results), "NA", ifelse(results >= 5, "5+ result(s)", Pluralize(results, "result")))
-  ) %>%
-  group_by(group, wiki, section, results) %>%
-  tally %>%
-  bar_chart(x = "section", y = "n", x_lab = "Section", y_lab = "Number of Hover-Over", geom_text_size = 2.5, 
-            title = "Number of hover-over events by section, number of results, test group and wiki") + 
+hover_breakdown_function(by_wiki = TRUE) + 
   facet_grid(wiki ~ results, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -977,28 +930,25 @@ rm(hover_rate)
 ### Same-wiki Zero Results Rate
 
 ```{r zrr_all, echo=FALSE}
-searches %>%
-  group_by(group) %>%
-  summarize(zero = sum(!`got same-wiki results`), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Zero Results Rate", title = "Proportion of searches that did not yield any same-wiki results, by test group",
-                   subtitle = "With 95% credible intervals.") + 
-  theme_facet(border = FALSE)
+zrr_function <- function(by_wiki = FALSE, ...) {
+  searches %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(zero = sum(!`got same-wiki results`), n_search = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(
+      y_lab = "Zero Results Rate", 
+      title = paste("Proportion of searches that did not yield any same-wiki results, by test group", switch(by_wiki, "and wiki", NULL)),
+      subtitle = "With 95% credible intervals."
+    )
+}
+zrr_function() + theme_facet(border = FALSE)
 ```
 
 ```{r zrr_wiki, echo=FALSE, eval=n_wiki > 1, fig.height=6*ceiling(n_wiki/3)}
-searches %>%
-  group_by(group, wiki) %>%
-  summarize(zero = sum(!`got same-wiki results`), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$zero, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Zero Results Rate", title = "Proportion of searches that did not yield any same-wiki results, by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+zrr_function(by_wiki = TRUE) +
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet()
 ```
@@ -1036,14 +986,17 @@ rm(zrr)
 ### Same-wiki Engagement
 
 ```{r engagement_all, echo=FALSE}
-samewiki_ctr_all <- searches %>% # save object samewiki_ctr_all for odds ratio plot
-  keep_where(`got same-wiki results` == TRUE) %>%
-  group_by(group) %>%
-  summarize(clickthroughs = sum(`same-wiki clickthrough`), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
-  )
+samewiki_ctr_function <- function(by_wiki = FALSE, ...) {
+  searches %>% 
+    keep_where(`got same-wiki results` == TRUE) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(clickthroughs = sum(`same-wiki clickthrough`), n_search = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
+    )
+}
+samewiki_ctr_all <- samewiki_ctr_function() # save object samewiki_ctr_all for odds ratio plot
 samewiki_ctr_all %>%
   pointrange_chart(y_lab = "Clickthrough rate", title = "Same-wiki clickthrough rates by test group",
                    subtitle = "With 95% credible intervals.") + 
@@ -1083,14 +1036,7 @@ for (this_group in test_group) {
 ```
 
 ```{r engagement_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(6 * ceiling(n_wiki / 3))}
-samewiki_ctr_bywiki <- searches %>% # save object samewiki_ctr_bywiki for odds ratio plot
-  keep_where(`got same-wiki results`) %>%
-  group_by(group, wiki) %>%
-  summarize(clickthroughs = sum(`same-wiki clickthrough`), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$clickthroughs, n = .$n_search, conf.level = 0.95))
-  )
+samewiki_ctr_bywiki <- samewiki_ctr_function(by_wiki = TRUE) # save object samewiki_ctr_bywiki for odds ratio plot
 samewiki_ctr_bywiki %>%
   pointrange_chart(y_lab = "Clickthrough rate", title = "Same-wiki clickthrough rates by test group and wiki",
                    subtitle = "With 95% credible intervals.") + 
@@ -1099,6 +1045,7 @@ samewiki_ctr_bywiki %>%
 ```
 
 ```{r engagement_OR_wiki, eval=(n_wiki > 1), echo=FALSE, results='asis', include=TRUE}
+# TODO: duplicated code engagement_OR_all
 control_group <- grep("control", params$`test_group_names`, value = TRUE)
 test_group <- setdiff(params$`test_group_names`, control_group)
 
@@ -1167,43 +1114,34 @@ rm(ctr)
 ### First Clicked Same-Wiki Result's Position
 
 ```{r first_clicked_all, echo=FALSE}
-searches %>%
-  keep_where(
-    `got same-wiki results`,
-    `same-wiki clickthrough`,
-    !is.na(`first clicked same-wiki results position`)
-  ) %>%
-  mutate(`first clicked result's position` = ifelse(`first clicked same-wiki results position` < 4, safe_ordinals(`first clicked same-wiki results position` + 1), "5th or higher")) %>%
-  group_by(group, `first clicked result's position`) %>%
-  tally %>%
-  mutate(total = sum(n)) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of searches", title = "Position of the first clicked same-wiki result by test group",
-                   subtitle = "With 95% credible intervals.") + 
+first_clicked_function <- function(by_wiki = FALSE, ...) {
+  searches %>%
+    keep_where(
+      `got same-wiki results`,
+      `same-wiki clickthrough`,
+      !is.na(`first clicked same-wiki results position`)
+    ) %>%
+    mutate(`first clicked result's position` = ifelse(`first clicked same-wiki results position` < 4, safe_ordinals(`first clicked same-wiki results position` + 1), "5th or higher")) %>%
+    group_by(!!! rlang::syms(c("group", "first clicked result's position", switch(by_wiki, "wiki", NULL)))) %>%
+    tally %>%
+    mutate(total = sum(n)) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(
+      y_lab = "Proportion of searches", 
+      title = paste("Position of the first clicked same-wiki result by test group", switch(by_wiki, "and wiki", NULL)),
+      subtitle = "With 95% credible intervals."
+    )
+}
+first_clicked_function() + 
   facet_wrap(~ `first clicked result's position`, ncol = 5, scales = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r first_clicked_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
-searches %>%
-  keep_where(
-    `got same-wiki results`,
-    `same-wiki clickthrough`,
-    !is.na(`first clicked same-wiki results position`)
-  ) %>%
-  mutate(`first clicked result's position` = ifelse(`first clicked same-wiki results position` < 4, safe_ordinals(`first clicked same-wiki results position` + 1), "5th or higher")) %>%
-  group_by(group, wiki, `first clicked result's position`) %>%
-  tally %>%
-  mutate(total = sum(n)) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(.$n, n = .$total, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of searches", title = "Position of the first clicked same-wiki result by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+first_clicked_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki + `first clicked result's position`, ncol = 5, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -1211,57 +1149,41 @@ searches %>%
 ### Maximum Clicked Position for Same-Wiki Results
 
 ```{r max_clicked_all, echo=FALSE}
-searches %>%
-  keep_where(
-    `got same-wiki results`,
-    `same-wiki clickthrough`,
-    !is.na(`max clicked position (same-wiki)`)
-  ) %>%
-  mutate(
-    `max clicked position (same-wiki)` = case_when(
-      `max clicked position (same-wiki)` < 4 ~ safe_ordinals(`max clicked position (same-wiki)` + 1),
-      `max clicked position (same-wiki)` >= 4 & `max clicked position (same-wiki)` < 20 ~ "5th - 20th",
-      TRUE ~ "21st or higher"
-      )
-  ) %>%
-  group_by(group, `max clicked position (same-wiki)`) %>%
-  summarize(counts = n()) %>%
-  mutate(total = sum(counts)) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
-  ) %>%
-  mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
-  pointrange_chart(y_lab = "Proportion of searches", title = "Maximum clicked position for same-wiki results, by test group",
-                   subtitle = "With 95% credible intervals.") + 
+max_clicked_function <- function(by_wiki = FALSE, ...) {
+  searches %>%
+    keep_where(
+      `got same-wiki results`,
+      `same-wiki clickthrough`,
+      !is.na(`max clicked position (same-wiki)`)
+    ) %>%
+    mutate(
+      `max clicked position (same-wiki)` = case_when(
+        `max clicked position (same-wiki)` < 4 ~ safe_ordinals(`max clicked position (same-wiki)` + 1),
+        `max clicked position (same-wiki)` >= 4 & `max clicked position (same-wiki)` < 20 ~ "5th - 20th",
+        TRUE ~ "21st or higher"
+        )
+    ) %>%
+    group_by(!!! rlang::syms(c("group", "max clicked position (same-wiki)", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(counts = n()) %>%
+    mutate(total = sum(counts)) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
+    ) %>%
+    mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
+    pointrange_chart(
+      y_lab = "Proportion of searches", 
+      title = paste("Maximum clicked position for same-wiki results, by test group", switch(by_wiki, "and wiki", NULL)),
+      subtitle = "With 95% credible intervals."
+    )
+}
+max_clicked_function() + 
   facet_wrap(~ `max clicked position (same-wiki)`, ncol = 6, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
 
 ```{r max_clicked_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
-searches %>%
-  keep_where(
-    `got same-wiki results`,
-    `same-wiki clickthrough`,
-    !is.na(`max clicked position (same-wiki)`)
-  ) %>%
-  mutate(
-    `max clicked position (same-wiki)` = case_when(
-      `max clicked position (same-wiki)` < 4 ~ safe_ordinals(`max clicked position (same-wiki)` + 1),
-      `max clicked position (same-wiki)` >= 4 & `max clicked position (same-wiki)` < 20 ~ "5th - 20th",
-      TRUE ~ "21st or higher"
-      )
-  ) %>%
-  group_by(group, wiki, `max clicked position (same-wiki)`) %>%
-  summarize(counts = n()) %>%
-  mutate(total = sum(counts)) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(.$counts, n = .$total, conf.level = 0.95))
-  ) %>%
-  mutate(`max clicked position (same-wiki)` = factor(`max clicked position (same-wiki)`, levels = c("1st", "2nd", "3rd", "4th", "5th - 20th", "21st or higher"))) %>%
-  pointrange_chart(y_lab = "Proportion of searches", title = "Maximum clicked position for same-wiki results, by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+max_clicked_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki + `max clicked position (same-wiki)`, ncol = 6, scale = "free_y") +
   theme_facet(axis.text.x = element_text(angle = 90))
 ```
@@ -1305,6 +1227,7 @@ searches %>%
 ```
 
 ```{r paulscores_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(6 * ceiling(n_wiki / 3))}
+# TODO: duplicated code paulscores_all
 searches %>%
   ungroup %>%
   keep_where(`same-wiki clickthrough` == TRUE) %>%
@@ -1334,35 +1257,28 @@ searches %>%
 `r if (exists("serp_offset")) { "### Other Pages of the Search Results" }`
 
 ```{r search_offset_all, eval=exists("serp_offset"), echo=FALSE}
-serp_offset %>%
-  group_by(session_id, serp_id) %>%
-  summarize(`Any page-turning` = any(offset > 0)) %>%
-  dplyr::right_join(searches, by = c("session_id", "serp_id")) %>%
-  group_by(group) %>%
-  summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of searches", title = "Proportion of searches with clicks to see other pages of the search results, by test group",
-                   subtitle = "With 95% credible intervals.") + 
-  theme_facet(border = FALSE)
+search_offset_function <- function(by_wiki = FALSE, ...) {
+  serp_offset %>%
+    group_by(session_id, serp_id) %>%
+    summarize(`Any page-turning` = any(offset > 0)) %>%
+    dplyr::right_join(searches, by = c("session_id", "serp_id")) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(
+      y_lab = "Proportion of searches", 
+      title = paste("Proportion of searches with clicks to see other pages of the search results, by test group", switch(by_wiki, "and wiki", NULL)),
+      subtitle = "With 95% credible intervals."
+    )
+}
+search_offset_function() + theme_facet(border = FALSE)
 ```
 
 ```{r search_offset_wiki, eval=(exists("serp_offset") & n_wiki > 1), echo=FALSE, fig.height=(6 * ceiling(n_wiki / 3))}
-serp_offset %>%
-  group_by(session_id, serp_id) %>%
-  summarize(`Any page-turning` = any(offset > 0)) %>%
-  dplyr::right_join(searches, by = c("session_id", "serp_id")) %>%
-  group_by(group, wiki) %>%
-  summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$page_turn, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of searches", 
-                   title = "Proportion of searches with clicks to see other pages of the search results, by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+search_offset_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet()
 ```
@@ -1394,6 +1310,7 @@ rm(temp)
 ```
 
 ```{r survival_wiki, eval=(exists("visitedPages") & n_wiki > 1), echo=FALSE, fig.height=(4 * n_wiki)}
+# TODO: duplicated code survival_all
 temp <- visitedPages
 temp$SurvObj <- with(temp, survival::Surv(dwell_time, status == 2))
 fit <- survival::survfit(SurvObj ~ group + wiki, data = temp)
@@ -1419,30 +1336,23 @@ rm(temp)
 `r if (exists("visitedPages")) { "### Scroll on visited pages" }`
 
 ```{r scroll_all, eval=exists("visitedPages"), echo=FALSE}
-visitedPages %>%
-  group_by(group) %>%
-  summarize(scrolls = sum(scroll), n_visit = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of visits", 
-                   title = "Proportion of visits with scroll by test group",
-                   subtitle = "With 95% credible intervals.") + 
-  theme_facet(border = FALSE)
+scroll_function <- function(by_wiki = FALSE, ...) {
+  visitedPages %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(scrolls = sum(scroll), n_visit = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(y_lab = "Proportion of visits", 
+                     title = paste("Proportion of visits with scroll by test group", switch(by_wiki, "and wiki", NULL)),
+                     subtitle = "With 95% credible intervals.")
+}
+scroll_function() + theme_facet(border = FALSE)
 ```
 
 ```{r scroll_wiki, eval=(exists("visitedPages") & n_wiki > 1), echo=FALSE, fig.height=(6 * ceiling(n_wiki / 3))}
-visitedPages %>%
-  group_by(group, wiki) %>%
-  summarize(scrolls = sum(scroll), n_visit = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_visit, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of visits", 
-                   title = "Proportion of visits with scroll by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+scroll_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet()
 ```
@@ -1450,28 +1360,25 @@ visitedPages %>%
 ### Search Abandon Rate
 
 ```{r search_abandon_rate_all, echo=FALSE}
-searches %>%
-  keep_where(`got same-wiki results` == TRUE) %>%
-  group_by(group) %>%
-  summarize(abandon = n() - sum(engaged), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$abandon, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Search Abandon Rate", title = "Proportion of searches without any actions on the result page by test group", subtitle = "With 95% credible intervals.") + 
-  theme_facet(border = FALSE)
+search_abandon_rate_function <- function(by_wiki = FALSE, ...) {
+  searches %>%
+    keep_where(`got same-wiki results` == TRUE) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(abandon = n() - sum(engaged), n_search = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$abandon, n = .$n_search, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(
+      y_lab = "Search Abandon Rate", 
+      title = paste("Proportion of searches without any actions on the result page by test group", switch(by_wiki, "and wiki", NULL)), 
+      subtitle = "With 95% credible intervals.")
+}
+search_abandon_rate_function() + theme_facet(border = FALSE)
 ```
 
 ```{r search_abandon_rate_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(6 * ceiling(n_wiki / 3))}
-searches %>%
-  keep_where(`got same-wiki results` == TRUE) %>%
-  group_by(group, wiki) %>%
-  summarize(abandon = n() - sum(engaged), n_search = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$abandon, n = .$n_search, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Search Abandon Rate", title = "Proportion of searches without any actions on the result page by test group and wiki", subtitle = "With 95% credible intervals.") + 
+search_abandon_rate_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet()
 ```
@@ -1479,32 +1386,24 @@ searches %>%
 ### Scroll on search result page
 
 ```{r scroll_serp_all, echo=FALSE}
-events %>% 
-  keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
-  group_by(group) %>%
-  summarize(scrolls = sum(n_scroll_serp > 0), n_serp = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_serp, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of SERPs", 
-                   title = "Proportion of search results pages with scroll by test group",
-                   subtitle = "With 95% credible intervals.") + 
-  theme_facet(border = FALSE)
+scroll_serp_function <- function(by_wiki = FALSE, ...) {
+  events %>% 
+    keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(scrolls = sum(n_scroll_serp > 0), n_serp = n()) %>%
+    ungroup %>%
+    cbind(
+      as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_serp, conf.level = 0.95))
+    ) %>%
+    pointrange_chart(y_lab = "Proportion of SERPs", 
+                     title = paste("Proportion of search results pages with scroll by test group", switch(by_wiki, "and wiki", NULL)),
+                     subtitle = "With 95% credible intervals.")
+}
+scroll_serp_function() + theme_facet(border = FALSE)
 ```
 
 ```{r scroll_serp_all_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(6 * ceiling(n_wiki / 3))}
-events %>% 
-  keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
-  group_by(group, wiki) %>%
-  summarize(scrolls = sum(n_scroll_serp > 0), n_serp = n()) %>%
-  ungroup %>%
-  cbind(
-    as.data.frame(binom:::binom.bayes(x = .$scrolls, n = .$n_serp, conf.level = 0.95))
-  ) %>%
-  pointrange_chart(y_lab = "Proportion of SERPs", 
-                   title = "Proportion of search results pages with scroll by test group and wiki",
-                   subtitle = "With 95% credible intervals.") + 
+scroll_serp_function(by_wiki = TRUE) + 
   facet_wrap(~ wiki, ncol = 3, scales = "free_y") +
   theme_facet()
 ```
@@ -1538,6 +1437,7 @@ rm(temp)
 ```
 
 ```{r serp_survival_wiki, eval=(exists("fulltext_from_auto") & n_wiki > 1), echo=FALSE, fig.height=(4 * n_wiki)}
+# TODO: duplicated code serp_survival_all
 temp <- events %>% keep_where(event == "searchResultPage", from_autocomplete == TRUE, `some same-wiki results` == TRUE)
 temp$SurvObj <- with(temp, survival::Surv(max_checkin_serp, status == 2))
 fit <- survival::survfit(SurvObj ~ group + wiki, data = temp)
@@ -1569,36 +1469,39 @@ Users may click back to the search result page directly after they clickthrough 
 - Among users with at least a click in their search session, the proportion of sessions that return to search for different things (different search result page but in the same session)
 
 ```{r return_rate_all, echo=FALSE}
-returnRate_to_same_search <- events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  group_by(group, serp_id) %>%
-  keep_where(sum(grepl("click", event)) > 0) %>% # Among search with at least 1 click
-  arrange(group, serp_id, timestamp) %>%
-  mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
-  keep_where(n_click_cumsum > 0) %>% # delete serp and hover before first click
-  summarize(comeback = sum(event %in% c("searchResultPage", "hover-on", "hover-off")) > 0 | sum(n_click_cumsum > 1) > 0) %>% # comeback to the same serp or make another click or hover
-  group_by(group) %>%
-  summarize(return_to_same_search = sum(comeback), n_search = length(unique(serp_id))) %>%
-  group_by(group) %>%
-  dplyr::do(binom::binom.bayes(.$return_to_same_search, .$n_search, conf.level = 0.95))
+return_rate_function <- function(by_wiki = FALSE, ...) {
+  returnRate_to_same_search <- events %>%
+    keep_where(!(event %in% c("visitPage", "checkin"))) %>%
+    group_by(!!! rlang::syms(c("group", "serp_id", switch(by_wiki, "wiki", NULL)))) %>%
+    keep_where(sum(grepl("click", event)) > 0) %>% # Among search with at least 1 click
+    arrange(group, serp_id, timestamp) %>%
+    mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
+    keep_where(n_click_cumsum > 0) %>% # delete serp and hover before first click
+    summarize(comeback = sum(event %in% c("searchResultPage", "hover-on", "hover-off")) > 0 | sum(n_click_cumsum > 1) > 0) %>% # comeback to the same serp or make another click or hover
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(return_to_same_search = sum(comeback), n_search = length(unique(serp_id))) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    dplyr::do(binom::binom.bayes(.$return_to_same_search, .$n_search, conf.level = 0.95))
 
-returnRate_to_other_search <- events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  group_by(group, session_id) %>%
-  keep_where(sum(grepl("click", event)) > 0) %>% # Among session with at least 1 click
-  arrange(group, session_id, timestamp) %>%
-  mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
-  keep_where(n_click_cumsum > 0) %>% # delete serp before first click
-  summarize(another_search = length(unique(serp_id)) > 1) %>% # comeback to make another search
-  group_by(group) %>%
-  summarize(return_to_make_another_search = sum(another_search), n_session = length(unique(session_id))) %>%
-  group_by(group) %>%
-  dplyr::do(binom::binom.bayes(.$return_to_make_another_search, .$n_session, conf.level = 0.95))
-
-dplyr::bind_rows("Return to the same search page" = returnRate_to_same_search, 
-                 "Return to make different search" = returnRate_to_other_search, .id = "type") %>%
-  pointrange_chart(y_lab = "Return rate", title = "Return rate after users clickthrough on search engine result pages",
-                   subtitle = "With 95% credible intervals.") + 
+  returnRate_to_other_search <- events %>%
+    keep_where(!(event %in% c("visitPage", "checkin"))) %>%
+    group_by(!!! rlang::syms(c("group", "session_id", switch(by_wiki, "wiki", NULL)))) %>%
+    keep_where(sum(grepl("click", event)) > 0) %>% # Among session with at least 1 click
+    arrange(group, session_id, timestamp) %>%
+    mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
+    keep_where(n_click_cumsum > 0) %>% # delete serp before first click
+    summarize(another_search = length(unique(serp_id)) > 1) %>% # comeback to make another search
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    summarize(return_to_make_another_search = sum(another_search), n_session = length(unique(session_id))) %>%
+    group_by(!!! rlang::syms(c("group", switch(by_wiki, "wiki", NULL)))) %>%
+    dplyr::do(binom::binom.bayes(.$return_to_make_another_search, .$n_session, conf.level = 0.95))
+  
+  dplyr::bind_rows("Return to the same search page" = returnRate_to_same_search, 
+                   "Return to make different search" = returnRate_to_other_search, .id = "type") %>%
+    pointrange_chart(y_lab = "Return rate", title = paste("Return rate after users clickthrough on search engine result pages", switch(by_wiki, "by wiki", NULL)),
+                     subtitle = "With 95% credible intervals.")
+}
+return_rate_function() + 
   facet_wrap(~ type, scales = "free_y") + 
   theme_facet(border = FALSE)
 
@@ -1606,36 +1509,7 @@ rm(returnRate_to_same_search, returnRate_to_other_search)
 ```
 
 ```{r return_rate_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(4 * n_wiki)}
-returnRate_to_same_search <- events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  group_by(wiki, group, serp_id) %>%
-  keep_where(sum(grepl("click", event)) > 0) %>% # Among search with at least 1 click
-  arrange(group, serp_id, timestamp) %>%
-  mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
-  keep_where(n_click_cumsum > 0) %>% # delete serp and hover before first click
-  summarize(comeback = sum(event %in% c("searchResultPage", "hover-on", "hover-off")) > 0 | sum(n_click_cumsum > 1) > 0) %>% # comeback to the same serp or make another click or hover
-  group_by(group, wiki) %>%
-  summarize(return_to_same_search = sum(comeback), n_search = length(unique(serp_id))) %>%
-  group_by(group, wiki) %>%
-  dplyr::do(binom::binom.bayes(.$return_to_same_search, .$n_search, conf.level = 0.95))
-
-returnRate_to_other_search <- events %>%
-  keep_where(!(event %in% c("visitPage", "checkin"))) %>%
-  group_by(wiki, group, session_id) %>%
-  keep_where(sum(grepl("click", event)) > 0) %>% # Among session with at least 1 click
-  arrange(group, session_id, timestamp) %>%
-  mutate(n_click_cumsum = cumsum(grepl("click", event))) %>%
-  keep_where(n_click_cumsum > 0) %>% # delete serp before first click
-  summarize(another_search = length(unique(serp_id)) > 1) %>% # comeback to make another search
-  group_by(group, wiki) %>%
-  summarize(return_to_make_another_search = sum(another_search), n_session = length(unique(session_id))) %>%
-  group_by(group, wiki) %>%
-  dplyr::do(binom::binom.bayes(.$return_to_make_another_search, .$n_session, conf.level = 0.95))
-
-dplyr::bind_rows("Return to the same search page" = returnRate_to_same_search, 
-                 "Return to make different search" = returnRate_to_other_search, .id = "type") %>%
-  pointrange_chart(y_lab = "Return rate", title = "Return rate after users clickthrough on search engine result pages, by wiki",
-                   subtitle = "With 95% credible intervals.") + 
+return_rate_function(by_wiki = TRUE) + 
   facet_grid(wiki ~ type, scale = "free_y") +
   theme_facet()
 
@@ -1645,26 +1519,21 @@ rm(returnRate_to_same_search, returnRate_to_other_search)
 ### Load time of search results pages
 
 ```{r serp_loadtime_all, echo=FALSE}
-events %>%
-  keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
-  ggplot(aes(x=load_time)) + 
-  scale_x_sqrt() + 
-  geom_density(aes(group=group, colour=group, fill=group), alpha=0.3) + 
-  scale_color_brewer("Group", palette = "Set1") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  labs(x = "Load Time (ms)", y = "Density", title = "Distribution of search result page load time by test group") +
-  theme_min()
+serp_loadtime_function <- function(by_wiki = FALSE, ...) {
+  events %>%
+    keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
+    ggplot(aes(x=load_time)) + 
+    scale_x_sqrt() + 
+    geom_density(aes(group=group, colour=group, fill=group), alpha=0.3) + 
+    scale_color_brewer("Group", palette = "Set1") +
+    scale_fill_brewer("Group", palette = "Set1") +
+    labs(x = "Load Time (ms)", y = "Density", title = paste("Distribution of search result page load time by test group", switch(by_wiki, "and wiki", NULL)))
+}
+serp_loadtime_function() + theme_min()
 ```
 
 ```{r serp_loadtime_wiki, echo=FALSE, eval=(n_wiki > 1), fig.height=(5 * n_wiki)}
-events %>%
-  keep_where(event == "searchResultPage", `some same-wiki results` == TRUE) %>%
-  ggplot(aes(x=load_time)) + 
-  scale_x_sqrt() + 
-  geom_density(aes(group=group, colour=group, fill=group), alpha=0.3) + 
-  scale_color_brewer("Group", palette = "Set1") +
-  scale_fill_brewer("Group", palette = "Set1") +
-  labs(x = "Load Time (ms)", y = "Density", title = "Distribution of search result page load time by test group and wiki") +
+serp_loadtime_function(by_wiki = TRUE) +
   facet_wrap(~ wiki, nrow = n_wiki, scales = "free_y") +
   theme_facet()
 ```
